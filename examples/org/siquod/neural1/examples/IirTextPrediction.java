@@ -28,7 +28,6 @@ import org.siquod.neural1.modules.regularizer.Regularizer;
 import org.siquod.neural1.net.Recurrent;
 import org.siquod.neural1.net.Recurrent.Eval;
 import org.siquod.neural1.net.Recurrent.NaiveTrainer;
-import org.siquod.neural1.neurons.Isrlu;
 import org.siquod.neural1.neurons.Neuron;
 import org.siquod.neural1.neurons.SeLU;
 import org.siquod.neural1.updaters.AmsGrad;

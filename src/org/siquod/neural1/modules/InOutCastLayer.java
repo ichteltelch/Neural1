@@ -1,9 +1,7 @@
 package org.siquod.neural1.modules;
 
-import org.siquod.neural1.InputDependency;
 import org.siquod.neural1.Interface;
 import org.siquod.neural1.InterfaceAllocator;
-import org.siquod.neural1.OutputDependency;
 
 
 public abstract class InOutCastLayer implements InOutModule{

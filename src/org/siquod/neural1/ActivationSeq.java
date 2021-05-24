@@ -1,8 +1,5 @@
 package org.siquod.neural1;
 
-import java.util.Arrays;
-
-
 public class ActivationSeq implements Cloneable{
 	ActivationSet[] steps;
 	int[] dropoutMasks;

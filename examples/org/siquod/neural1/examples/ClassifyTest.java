@@ -3,7 +3,6 @@ package org.siquod.neural1.examples;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -11,17 +10,10 @@ import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 
-import org.siquod.neural1.Interface;
-import org.siquod.neural1.Module;
-import org.siquod.neural1.modules.BackpropStopper;
-import org.siquod.neural1.modules.BatchNorm;
-import org.siquod.neural1.modules.Copy;
+import org.siquod.neural1.modules.BatchReNorm;
 import org.siquod.neural1.modules.Dense;
 import org.siquod.neural1.modules.Dropout;
-import org.siquod.neural1.modules.InOutCastFactory;
-import org.siquod.neural1.modules.InOutCastLayer;
 import org.siquod.neural1.modules.InOutModule;
-import org.siquod.neural1.modules.Maxout;
 import org.siquod.neural1.modules.Nonlin;
 import org.siquod.neural1.modules.StackModule;
 import org.siquod.neural1.modules.loss.SoftMaxNllLoss;
@@ -30,49 +22,12 @@ import org.siquod.neural1.modules.regularizer.Regularizer;
 import org.siquod.neural1.net.FeedForward;
 import org.siquod.neural1.neurons.Isrlu;
 import org.siquod.neural1.neurons.Neuron;
-import org.siquod.neural1.neurons.Relu;
-import org.siquod.neural1.neurons.Tanh;
+import org.siquod.neural1.updaters.*;
 
 
 public class ClassifyTest {
-	private Regularizer reg=new L2Reg(.000001);
-//	private Neuron neuron=new Relu();
-	private Neuron neuron=new Isrlu().fixA(4);
-//	private Neuron neuron=new Tanh();
 
-	InOutModule mod = new StackModule()
-//			.addLayer(2, new BatchNorm())
-			.addLayer(50, new Dense().regularizer(reg), new BatchNorm()
-					)
-	.addLayer(50, new Nonlin(neuron))
-	.addLayer(Dropout.factory(0.9))
-	.addLayer(40, new Dense().regularizer(reg), new BatchNorm(), 
-			new Nonlin(neuron))
-	.addLayer(Dropout.factory(.9))
-//	.addLayer(20, new FullyConnected().regularizer(reg), new SimpleNonlinLayer(neuron))
-	//.addFinalLayer(3, new FullyConnected(), new SimpleNonlinLayer(neuron))
-	.addFinalLayer(3, new Dense().regularizer(reg))
-	;
-	int k=3;
-	int n=2;
-	InOutModule mod2 = new StackModule()
-	.addLayer(n, new Copy(0, null))
-	.addLayer(Dropout.factory(0.7))
-	.addLayer(3*n*k, new Dense().regularizer(reg))
-	.addLayer(3*n, new Maxout())
-	.addLayer(Dropout.factory(0.5))
-	.addLayer(3*n*k, new Dense().regularizer(reg))
-	.addLayer(3*n, new Maxout())
-	.addLayer(Dropout.factory(0.5))
-	.addLayer(3*n*k, new Dense().regularizer(reg))
-	.addLayer(3*n, new Maxout())
-	.addLayer(Dropout.factory(0.5))
-	.addLayer(2*n*k, new Dense().regularizer(reg))
-	.addLayer(2*n, new Maxout())
-	//.addFinalLayer(3, new FullyConnected(), new SimpleNonlinLayer(neuron))
-	.addFinalLayer(3, new Dense().regularizer(reg))
-	;
-
+	//Example data sets
 	static float[][][] data1;
 	static float[][][] data2;
 	static{
@@ -91,50 +46,120 @@ public class ClassifyTest {
 			for(int j=0; j<data2[i].length; j++){
 				float rad = j*.3f+1;
 				float ang = (float) (2*Math.PI*(i/3.0 + j/(15.0*20)+Math.cos(rad*.03)));
-				data2[i][j][0] = (float) (Math.cos(ang)*rad);
-				data2[i][j][1] = (float) (Math.sin(ang)*rad);
+				data2[i][j][0] = (float) (Math.cos(ang)*rad+ rnd.nextGaussian()*6);
+				data2[i][j][1] = (float) (Math.sin(ang)*rad+ rnd.nextGaussian()*6);
 			}
 		}		
 	}
+	
+	
+	
+	//Choose a weight regularizer
+	private Regularizer reg=new L2Reg(.000001);
+
+	//Choose an activation function/nonlinearity
+	//	private Neuron neuron=new Relu();
+	private Neuron neuron=new Isrlu().fixA(4);
+
+	//Define the main network module as a stack of layers
+	InOutModule mod = new StackModule()
+			//			.addLayer(2, new BatchNorm())
+			//Add a dense layer, followed by a batch normalization layer, with 50 channels each
+			.addLayer(50, new Dense().regularizer(reg), new BatchReNorm())
+			//Add a nonlinearity layer using the chosen activation function
+			.addLayer(50, new Nonlin(neuron))
+			//Add a dropout layer for better regularization
+			.addLayer(Dropout.factory(0.9))
+			//Add another dense and batch norm and nonlinearity layer, with 40 channels each
+			.addLayer(40, new Dense().regularizer(reg), new BatchReNorm(), new Nonlin(neuron))
+			//And another dropout layer
+			.addLayer(Dropout.factory(.9))
+			//Add a final dense layer
+			.addFinalLayer(3, new Dense().regularizer(reg))
+			;
+	
+	//Another example of a network definition
+//	int k=3;
+//	int n=2;
+//	InOutModule mod2 = new StackModule()
+//			.addLayer(n, new Copy(0, null))
+//			.addLayer(Dropout.factory(0.7))
+//			.addLayer(3*n*k, new Dense().regularizer(reg))
+//			.addLayer(3*n, new Maxout())
+//			.addLayer(Dropout.factory(0.5))
+//			.addLayer(3*n*k, new Dense().regularizer(reg))
+//			.addLayer(3*n, new Maxout())
+//			.addLayer(Dropout.factory(0.5))
+//			.addLayer(3*n*k, new Dense().regularizer(reg))
+//			.addLayer(3*n, new Maxout())
+//			.addLayer(Dropout.factory(0.5))
+//			.addLayer(2*n*k, new Dense().regularizer(reg))
+//			.addLayer(2*n, new Maxout())
+//			.addFinalLayer(3, new Dense().regularizer(reg))
+//			;
+	
 
 
 
 
+	//buffer for the network input during test time
 	float[] inputs=new float[2];
+	//buffer for the network output during test time
 	float[] outputs=new float[3];
-	float[][][] data;
-	//SequentialNet.SGDTrainer net;
-	static float maf=.3f, mafi=1/maf;
-
+	
+	//The whole network, comprising main module and loss layer
 	FeedForward net=new FeedForward(mod, new SoftMaxNllLoss(), inputs.length, outputs.length);
+
+	
+	//the data set to operate on
+	float[][][] data;
+
+
+	//The trainer for the network
 	FeedForward.NaiveTrainer tr;
+	//The evaluator for the network
 	FeedForward.Eval eval;
 
+	//For displaying the training data and the current networks classification
 	JLabel disp;
-
 	private BufferedImage dispOutput;
-	private ArrayList<float[]> allInputs=new ArrayList<>();
+	
+	//Whether to use minibatches, or just a single batch made of the whole data set.
+	boolean miniBatches=!false;
+
+	//the batch size
+	int batchSize;
 
 
 
 	public ClassifyTest(float[][][] data){
 		this.data=data;
-		for(float[][] dd: data)
-			for(float[] d: dd)
-				allInputs.add(d);
+		
+		//make the display
 		JFrame jf=new JFrame();
-		dispOutput=new BufferedImage(200, 200, BufferedImage.TYPE_INT_RGB);
+		dispOutput=new BufferedImage(400, 400, BufferedImage.TYPE_INT_RGB);
 		disp=new JLabel(new ImageIcon(dispOutput));
 		jf.add(disp);
 		jf.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		jf.pack();
 		jf.setVisible(true);
 
-		int batchSize=0;
-		for(float[][] a : data)
-			batchSize+=a.length;
-		tr=net.getNaiveTrainer(batchSize).initSmallWeights(1);
+		//determine batch size
+		if(miniBatches) {
+			batchSize=128;
+		}else {
+			batchSize=0;
+			for(float[][] a : data)
+				batchSize+=a.length;
+		}
+		
+
+		//Create the trainer and initialize the weights
+		tr=net.getNaiveTrainer(batchSize, new AmsGrad());
 		tr.initSmallWeights(1);
+		tr.learnRate=0.01;
+
+		//create the evaluator
 		eval=tr.getEvaluator(false);
 
 	}
@@ -142,8 +167,7 @@ public class ClassifyTest {
 
 	private void run() {
 		while(true){
-			batchTrain(1);
-			//train(10000);
+			batchTrain(miniBatches?1:100);
 			updateGraphics();
 			disp.repaint();
 		}
@@ -152,7 +176,7 @@ public class ClassifyTest {
 
 
 	private void updateGraphics() {
-		
+
 		double txmin, txmax, tymin, tymax;
 		txmin=tymin=Double.POSITIVE_INFINITY;
 		txmax=tymax=Double.NEGATIVE_INFINITY;
@@ -213,14 +237,28 @@ public class ClassifyTest {
 	}
 
 	private void batchTrain(int its) {
+		Random r = new Random();
 		for(int it=0; it<its; it++){
-			for(int c=0; c<data.length; c++){
-				Arrays.fill(outputs, 0);
-				outputs[c]=1;
-				for(int i=0; i<data[c].length; i++){
+			if(miniBatches) {
+				//randomly choose training examples
+				for(int b=0; b<batchSize; ++b) {
+					int c = r.nextInt(data.length);
+					Arrays.fill(outputs, 0);
+					outputs[c]=1;
+					int i = r.nextInt(data[c].length);
 					tr.addToBatch(data[c][i], outputs, 1);
 				}
+			}else {
+				//put all data points into the batch
+				for(int c=0; c<data.length; c++){
+					Arrays.fill(outputs, 0);
+					outputs[c]=1;
+					for(int i=0; i<data[c].length; i++){
+						tr.addToBatch(data[c][i], outputs, 1);
+					}
+				}
 			}
+			//End the batch and comput the training loss
 			double loss=
 					tr.endBatch();
 			System.out.println(loss);

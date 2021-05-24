@@ -170,7 +170,7 @@ public class BatchReNorm implements InOutScaleBiasModule{
 
 	@Override
 	public void backprop(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, int t, int[] inst) {
-		float dmax=dmaxSchedule.apply(age);
+//		float dmax=dmaxSchedule.apply(age);
 		float rmax=rmaxSchedule.apply(age);
 		if(inst==null) {
 			for(int i=0; i<in.count; ++i) {
@@ -178,11 +178,11 @@ public class BatchReNorm implements InOutScaleBiasModule{
 				float mean = as.batchParams.get(t).get(this.mean, i);
 				float sdev = as.batchParams.get(t).get(this.sdev, i);
 				float scal = 1/sdev;
-				float rmean=params.get(runningMean, i);
+//				float rmean=params.get(runningMean, i);
 				float rsdev=params.get(runningSdev, i);
 
 				float r=Math.min(rmax, Math.max(1/rmax, sdev/rsdev));
-				float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
+//				float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
 
 				//				float addVal=params.get(add, i);
 				float multVal=params.get(mult, i);

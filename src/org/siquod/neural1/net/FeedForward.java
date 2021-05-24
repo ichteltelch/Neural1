@@ -1,11 +1,5 @@
 package org.siquod.neural1.net;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import java.util.function.Function;
 
 import org.siquod.neural1.ActivationBatch;
@@ -22,7 +16,6 @@ import org.siquod.neural1.modules.Dense;
 import org.siquod.neural1.modules.InOutModule;
 import org.siquod.neural1.modules.loss.LossLayer;
 import org.siquod.neural1.updaters.Rprop;
-import org.siquod.neural1.updaters.SGD;
 import org.siquod.neural1.updaters.Updater;
 
 public class FeedForward {
@@ -63,8 +56,8 @@ public class FeedForward {
 	public class NaiveTrainer implements Cloneable{
 		ParamSet ps=new ParamSet(paramCount);
 		ParamSet grad=new ParamSet(paramCount);
-		Updater u=new Rprop();
-//		Updater u=new SGD();
+//		Updater u=new Rprop();
+		Updater u;//=new SGD();
 		ActivationBatch ass, ess;
 //		ActivationSeq as=ia.makeSeq(1).init().entire();
 //		ActivationSet a=as.get(0);
@@ -92,10 +85,11 @@ public class FeedForward {
 			r.imp=imp.clone();
 			return r;
 		}
-		public NaiveTrainer(int batchSize) {
+		public NaiveTrainer(int batchSize, Updater updater) {
 			ass=new ActivationBatch(batchSize, 1, ia, ba);
 			ess=new ActivationBatch(batchSize, 1, ia, ba);
 			imp=new float[batchSize];
+			u = updater==null?new Rprop():updater;
 		}
 
 		public void addToBatch(float[] input, float[] targ, double importance){
@@ -107,6 +101,7 @@ public class FeedForward {
 			currentBatchSize++;
 		}
 
+		@SuppressWarnings("unused")
 		private void nop() {			
 		}
 
@@ -220,8 +215,8 @@ public class FeedForward {
 //		evalPlan=gr.makePlan(0, true, "test");
 //		trainPlan=gr.makePlan(0, false, "training");
 	}
-	public NaiveTrainer getNaiveTrainer(int bs) {
-		return new NaiveTrainer(bs);
+	public NaiveTrainer getNaiveTrainer(int bs, Updater u) {
+		return new NaiveTrainer(bs, u);
 	}
 
 }

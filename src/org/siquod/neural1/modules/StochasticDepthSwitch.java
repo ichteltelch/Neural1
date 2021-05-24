@@ -1,7 +1,6 @@
 package org.siquod.neural1.modules;
 
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 
 import org.siquod.neural1.ActivationBatch;

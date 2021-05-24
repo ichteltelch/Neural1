@@ -7,12 +7,10 @@ import java.util.List;
 
 import org.siquod.neural1.ActivationBatch;
 import org.siquod.neural1.ForwardPhase;
-import org.siquod.neural1.InputDependency;
 import org.siquod.neural1.Interface;
 import org.siquod.neural1.InterfaceAllocator;
 import org.siquod.neural1.Module;
 import org.siquod.neural1.NopCastLayer;
-import org.siquod.neural1.OutputDependency;
 import org.siquod.neural1.ParamAllocator;
 import org.siquod.neural1.ParamBlocks;
 import org.siquod.neural1.ParamSet;

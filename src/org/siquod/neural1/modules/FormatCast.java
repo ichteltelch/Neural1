@@ -4,7 +4,6 @@ import java.util.Collections;
 import java.util.List;
 
 import org.siquod.neural1.ActivationBatch;
-import org.siquod.neural1.ActivationSet;
 import org.siquod.neural1.ForwardPhase;
 import org.siquod.neural1.Interface;
 import org.siquod.neural1.InterfaceAllocator;

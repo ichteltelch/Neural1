@@ -1,11 +1,7 @@
 package org.siquod.neural1.net;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import java.util.Random;
 import java.util.function.Function;
 
@@ -22,10 +18,7 @@ import org.siquod.neural1.TensorFormat;
 import org.siquod.neural1.modules.Dense;
 import org.siquod.neural1.modules.InOutModule;
 import org.siquod.neural1.modules.loss.LossLayer;
-import org.siquod.neural1.updaters.Adam;
 import org.siquod.neural1.updaters.AmsGrad;
-import org.siquod.neural1.updaters.Rprop;
-import org.siquod.neural1.updaters.SGD;
 import org.siquod.neural1.updaters.Updater;
 
 public class Recurrent {

@@ -15,23 +15,18 @@ import org.siquod.neural1.modules.Conv1D;
 import org.siquod.neural1.modules.Copy;
 import org.siquod.neural1.modules.Dense;
 import org.siquod.neural1.modules.Dropout;
-import org.siquod.neural1.modules.FormatCast;
 import org.siquod.neural1.modules.InOutModule;
 import org.siquod.neural1.modules.LogSoftmax;
 import org.siquod.neural1.modules.MaxPooling1D;
 import org.siquod.neural1.modules.Maxout;
 import org.siquod.neural1.modules.Nonlin;
 import org.siquod.neural1.modules.StackModule;
-import org.siquod.neural1.modules.StochasticPooling1D;
 import org.siquod.neural1.modules.loss.NllLoss;
-import org.siquod.neural1.modules.loss.SoftMaxNllLoss;
 import org.siquod.neural1.modules.regularizer.L2Reg;
 import org.siquod.neural1.modules.regularizer.Regularizer;
 import org.siquod.neural1.net.FeedForward;
 import org.siquod.neural1.neurons.Isrlu;
 import org.siquod.neural1.neurons.Neuron;
-import org.siquod.neural1.neurons.Relu;
-import org.siquod.neural1.neurons.Tanh;
 
 public class FirTextPrediction {
 	
@@ -123,7 +118,7 @@ public class FirTextPrediction {
 	FeedForward net=new FeedForward(mod, new NllLoss(), new TensorFormat(depth, alphabet.length()), 
 			new TensorFormat(alphabet.length()));
 
-	FeedForward.NaiveTrainer tr=net.getNaiveTrainer(batchSize).initSmallWeights(0.1);
+	FeedForward.NaiveTrainer tr=net.getNaiveTrainer(batchSize, null).initSmallWeights(0.1);
 	FeedForward.Eval eval=tr.getEvaluator(false);
 
 	public FirTextPrediction(ArrayList<int[]> load) {

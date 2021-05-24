@@ -14,7 +14,6 @@ import org.siquod.neural1.ParamAllocator;
 import org.siquod.neural1.ParamBlock;
 import org.siquod.neural1.ParamBlocks;
 import org.siquod.neural1.ParamSet;
-import org.siquod.neural1.TensorFormat;
 
 public class LayerNorm implements InOutScaleBiasModule{
 
