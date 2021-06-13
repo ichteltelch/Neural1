@@ -125,7 +125,7 @@ public class ClassifyTest {
 	private BufferedImage dispOutput;
 	
 	//Whether to use minibatches, or just a single batch made of the whole data set.
-	boolean miniBatches=!false;
+	boolean miniBatches=false;
 
 	//the batch size
 	int batchSize;
