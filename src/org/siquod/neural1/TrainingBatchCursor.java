@@ -10,6 +10,88 @@ package org.siquod.neural1;
  *
  */
 public interface TrainingBatchCursor extends TrainingDataGiver{
+	public static final class SingletonBatchCursorSingleOutput implements TrainingBatchCursor {
+		private final double output;
+		private final double[] inputs;
+		public double weight;
+		boolean consumed=false;
+
+		public SingletonBatchCursorSingleOutput(double output, double[] inputs, double weight) {
+			this.output = output;
+			this.inputs = inputs;
+			this.weight = weight;
+		}
+
+		@Override public int outputCount() {return 1;}
+
+		@Override public int inputCount() {return inputs.length;}
+
+		@Override public void giveOutputs(double[] outputs0) {
+			outputs0[0]=output;
+		}
+
+		@Override public void giveInputs(double[] inputs0) {
+			System.arraycopy(inputs, 0, inputs0, 0, inputs.length);
+		}
+
+		@Override public double getWeight() {return weight;}
+
+		@Override
+		public void reset() {
+			consumed=false;
+		}
+
+		@Override
+		public void next() {
+			consumed=true;
+		}
+
+		@Override
+		public boolean isFinished() {
+			return consumed;
+		}
+	}
+	public static final class SingletonBatchCursor implements TrainingBatchCursor {
+		private final double[] inputs;
+		private final double[] outputs;
+		public double weight;
+		boolean consumed=false;
+
+		public SingletonBatchCursor(double[] inputs, double[] outputs, double weight) {
+			this.inputs = inputs;
+			this.outputs = outputs;
+			this.weight = weight;
+		}
+
+		@Override public int outputCount() {return outputs.length;}
+
+		@Override public int inputCount() {return inputs.length;}
+
+		@Override public void giveOutputs(double[] outputs0) {
+			System.arraycopy(outputs, 0, outputs0, 0, outputs.length);
+		}
+
+		@Override public void giveInputs(double[] inputs0) {
+			System.arraycopy(inputs, 0, inputs0, 0, inputs.length);
+		}
+
+		@Override public double getWeight() {return weight;}
+
+		@Override
+		public void reset() {
+			consumed=false;
+		}
+
+		@Override
+		public void next() {
+			consumed=true;
+		}
+
+		@Override
+		public boolean isFinished() {
+			return consumed;
+		}
+	}
 	/**
 	 * Go to the next data item, or reach the end of the sequence
 	 */
@@ -105,56 +187,54 @@ public interface TrainingBatchCursor extends TrainingDataGiver{
 		ret.reset();
 		return ret;
 	}
+	/**
+	 * Make a sequence containing one element
+	 * @param inputs This array is not copied, so if you change it, you change the singleton
+	 * @param outputs This array is not copied, so if you change it, you change the singleton
+	 * @param weight
+	 * @return
+	 */
 	public static TrainingBatchCursor singleton(double[] inputs, double[] outputs, double weight) {
-		return new TrainingBatchCursor() {
-			@Override public int outputCount() {return outputs.length;}
-			@Override public int inputCount() {return inputs.length;}
-			@Override public void giveOutputs(double[] outputs0) {
-				System.arraycopy(outputs, 0, outputs0, 0, outputs.length);
-			}
-			@Override public void giveInputs(double[] inputs0) {
-				System.arraycopy(inputs, 0, inputs0, 0, inputs.length);
-			}
-			@Override public double getWeight() {return weight;}
-			boolean consumed=false;
-			@Override
-			public void reset() {
-				consumed=false;
-			}
-			@Override
-			public void next() {
-				consumed=true;
-			}
-			@Override
-			public boolean isFinished() {
-				return consumed;
-			}
-		};
+		return new SingletonBatchCursor(inputs, outputs, weight);
 	}
+	/**
+	 * Make a sequence containing one element that has a single output
+	 * @param inputs This array is not copied, so if you change it, you change the singleton
+	 * @param output This array is not copied, so if you change it, you change the singleton
+	 * @param weight
+	 * @return
+	 */
 	public static TrainingBatchCursor singleton(double[] inputs, double output, double weight) {
+		return new SingletonBatchCursorSingleOutput(output, inputs, weight);
+	}
+	/**
+	 * Make a wrapper for a {@link TrainingBatchCursor} that enriches its inputs by
+	 * taking polynomial combinations of the original data's inputs up to a given order
+	 * 
+	 * @param back
+	 * @param order
+	 * @return
+	 */
+	public static TrainingBatchCursor polyInteractionFeatures(TrainingBatchCursor back, int order) {
+		int bic = back.inputCount();
+		int eInp = bic;
+		for(int i=2; i<order; ++i)
+			eInp+=PolyInteraction.simplexNumber(bic, i);
+		int inputCount = eInp;
 		return new TrainingBatchCursor() {
-			@Override public int outputCount() {return 1;}
-			@Override public int inputCount() {return inputs.length;}
-			@Override public void giveOutputs(double[] outputs0) {
-				outputs0[0]=output;
+			@Override public int outputCount() {return back.outputCount();}
+			@Override public int inputCount() {return inputCount;}
+			@Override public void giveOutputs(double[] outputs) {back.giveOutputs(outputs);}
+			@Override public void giveInputs(double[] inputs) {
+				back.giveInputs(inputs);
+				PolyInteraction.apply(bic, 2, order, inputs, 0, inputs, bic);
 			}
-			@Override public void giveInputs(double[] inputs0) {
-				System.arraycopy(inputs, 0, inputs0, 0, inputs.length);
-			}
-			@Override public double getWeight() {return weight;}
-			boolean consumed=false;
-			@Override
-			public void reset() {
-				consumed=false;
-			}
-			@Override
-			public void next() {
-				consumed=true;
-			}
-			@Override
-			public boolean isFinished() {
-				return consumed;
-			}
+			@Override public double getWeight() {return back.getWeight();}
+			@Override public void reset() {back.reset();}
+			@Override public void next() {back.next();}
+			@Override public boolean isFinished() {return back.isFinished();}
 		};
+		
+		
 	}
 }

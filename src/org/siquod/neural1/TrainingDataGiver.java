@@ -35,4 +35,6 @@ public interface TrainingDataGiver {
 	 */
 	public double getWeight();
 	
+	
+	
 }
