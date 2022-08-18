@@ -4,10 +4,10 @@ package org.siquod.neural1.data;
 
 
 
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.RandomAccess;
 
 /**
  * A {@link TrainingBatchCursor} presents a sequence of training data items to a
@@ -147,6 +147,7 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 
 			
 
+			@SuppressWarnings("unchecked")
 			@Override
 			public WhitenedRandomAccess<B> clone() {
 				return new WhitenedRandomAccess<B>((B)((RandomAccess)back).clone(), whitenInputs, whitenOutputs);
@@ -635,6 +636,7 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 			back.reset();
 		}
 
+		@SuppressWarnings("unchecked")
 		@Override
 		public WhitenedTrainingBatchCursor<B> clone() {
 			return new WhitenedTrainingBatchCursor<B>((B)((TrainingBatchCursor)back).clone(), whitenInputs, whitenOutputs);

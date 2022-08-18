@@ -142,6 +142,7 @@ public class FeedForward {
 			float[] outBufferFloat = new float[outBuffer.length];
 //			System.out.println("Training for one epoch!");
 			boolean last=false;
+			@SuppressWarnings("unused")
 			int count=0;
 			while(!last) {
 				for(currentBatchSize=0; currentBatchSize<batchSize; ++currentBatchSize, ++count) {
