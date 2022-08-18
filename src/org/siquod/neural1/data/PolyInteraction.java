@@ -1,21 +1,66 @@
-package org.siquod.neural1;
+package org.siquod.neural1.data;
 
 import java.util.Arrays;
 
-/**
- * This class is a copy of {@link PolyInteraction} where doubles are replaced by Strings
- * so as to verify that everything is correct.
- * @author bb
- *
- */
-public class PolyInteractionString {
-
+public class PolyInteraction {
+	/**
+	 * Compute the sum of the n-th simplex numbers from dimension minOrder up to an including dimension maxOrder
+	 * @param n
+	 * @param minOrder
+	 * @param maxOrder
+	 * @return
+	 */
+	public static int simplexNumberSum(int n, int minOrder, int maxOrder) {
+		//g n o i = if i>o then 0 else (((n+i)/(i+1))*(1 + g n o (i+1)))
+		//ss o n = g n o 1
+		long numer = 0;
+		long denom = 1;
+		for(int i=maxOrder; i>0; --i) {
+			if(i>=minOrder)
+				numer+=denom;
+			numer *= (n+i-1);
+			denom *= i;
+			long gcd = gcd(numer, denom);
+			numer/=gcd;
+			denom/=gcd;
+		}
+		assert denom==1;
+		return (int) numer;
+		
+	}
+//	public static int simplexNumberSum(int n, int minOrder, int maxOrder) {
+//
+//		int ret = 0;
+//		for(int i=minOrder; i<=maxOrder; ++i)
+//			ret += simplexNumber(n, i);
+//		return ret;
+//	}
+	public static int simplexNumberSum(int n, int maxOrder) {
+		//g n o i = if i>=o then 0 else (((n+i)/(i+1))*(1 + g n o (i+1)))
+		//ss o n = g n o 0
+		long numer = 0;
+		long denom = 1;
+		for(int i=maxOrder; i>0; --i) {
+			numer+=denom;
+			numer *= (n+i-1);
+			denom *= i;
+			long gcd = gcd(numer, denom);
+			numer/=gcd;
+			denom/=gcd;
+		}
+		assert denom==1;
+		return (int) numer;
+		
+	}
 	public static int simplexNumber(int n, int order) {
 		long num = n;
 		long den = 1;
 		for(int i=1; i<order; ++i) {
 			num *= n+i;
 			den *= i+1;
+			long gcd = gcd(num, den);
+			num/=gcd;
+			den/=gcd;
 		}
 		return (int)(num/den);
 	}
@@ -38,10 +83,10 @@ public class PolyInteractionString {
 	 * 
 	 */
 
-	public static int apply(int n, int minOrder, int maxOrder, String[] in, int inOffset, String[] out, int outOffset) {
+	public static int apply(int n, int minOrder, int maxOrder, double[] in, int inOffset, double[] out, int outOffset) {
 		int count = 0;
 		for(int order = minOrder; order<=maxOrder; ++order) {
-			count+=apply(n, order, in, inOffset, out, outOffset+count, "");
+			count+=apply(n, order, in, inOffset, out, outOffset+count, 1);
 		}
 		return count;
 	}
@@ -60,22 +105,23 @@ public class PolyInteractionString {
 	 * @return The number of results that were written to the outputs array, 
 	 * which will be {@link #simplexNumber(int, int) simplexNumber(n, order)}
 	 */
-	public static int apply(int n, int order, String[] in, int inOffset, String[] out, int outOffset) {
-		return apply(n, order, in, inOffset, out, outOffset, "");
+	public static int apply(int n, int order, double[] in, int inOffset, double[] out, int outOffset) {
+		return apply(n, order, in, inOffset, out, outOffset, 1);
 	}
+	
 
-	private static int apply(int n, int order, String[] in, int inOffset, String[] out, int outOffset, String multiplier) {
+	private static int apply(int n, int order, double[] in, int inOffset, double[] out, int outOffset, double multiplier) {
 		if(order<=0) {
 			out[outOffset] = multiplier;
 			return 1;
 		}else if (order==1) {
 			for(int i=0; i<n; ++i)
-				out[outOffset+i] = multiplier+" "+in[inOffset+i];
+				out[outOffset+i] = in[inOffset+i]*multiplier;
 			return n;
 		}else {
 			int count = 0;
 			for(int i=0; i<n; ++i) {
-				count+=apply(i+1, order-1, in, inOffset, out, outOffset+count, multiplier+" "+in[inOffset+i]);
+				count+=apply(i+1, order-1, in, inOffset, out, outOffset+count, multiplier*in[inOffset+i]);
 			}
 			return count;
 		}
@@ -95,11 +141,11 @@ public class PolyInteractionString {
 	 * which will be {@link #simplexNumber(int, int) simplexNumber(n, order)}
 	 */
 	public static int diffApply(int n, int minOrder, int maxOrder, 
-			String[] in, int inOffset, String[] din, int dinOffset,
-			String[] dout, int doutOffset) {
+			double[] in, int inOffset, double[] din, int dinOffset,
+			double[] dout, int doutOffset) {
 		int count = 0;
 		for(int order = minOrder; order<=maxOrder; ++order) {
-			count+=diffApply(n, order, in, inOffset, din, dinOffset, dout, doutOffset+count, "");
+			count+=diffApply(n, order, in, inOffset, din, dinOffset, dout, doutOffset+count, 1);
 		}
 		return count;
 	}
@@ -117,17 +163,17 @@ public class PolyInteractionString {
 	 * @return The number of output gradients that were accessed, 
 	 * which will be {@link #simplexNumber(int, int) simplexNumber(n, order)}
 	 */
-	public static int diffApply(int n, int order, String[] in, int inOffset, String[] din, int dinOffset,
-			String[] dout, int doutOffset) {
-		return diffApply(n, order, in, inOffset, din, dinOffset, dout, doutOffset, "");
+	public static int diffApply(int n, int order, double[] in, int inOffset, double[] din, int dinOffset,
+			double[] dout, int doutOffset) {
+		return diffApply(n, order, in, inOffset, din, dinOffset, dout, doutOffset, 1);
 	}
-	static int diffApply(int n, int order, String[] in, int inOffset, String[] din, int dinOffset,
-			String[] dout, int doutOffset, String multiplier) {
+	static int diffApply(int n, int order, double[] in, int inOffset, double[] din, int dinOffset,
+			double[] dout, int doutOffset, double multiplier) {
 		if(order<=0){
 			throw new IllegalArgumentException("order must be positive");
 		}else if(order==1) {
 			for(int i=0; i<n; ++i)
-				din[dinOffset+i] += " + " + multiplier + " " + dout[doutOffset+i];
+				din[dinOffset+i] += dout[doutOffset+i]*multiplier;
 			return n;
 		}else {
 			{
@@ -141,7 +187,7 @@ public class PolyInteractionString {
 				int count = 0;
 				for(int i=0; i<n; ++i) {
 					count+=diffApply(i+1, order-1, in, inOffset, din, dinOffset, 
-							dout, doutOffset+count, multiplier+" "+in[inOffset+i]);
+							dout, doutOffset+count, multiplier*in[inOffset+i]);
 				}
 				return count;
 			}
@@ -149,19 +195,19 @@ public class PolyInteractionString {
 		}
 
 	}
-	static int diffApply(int n, int order, String[] in, int inOffset, String[] din, int dinOffset,
-			String[] dout, int doutOffset, String multiplier, int varIndex) {
+	static int diffApply(int n, int order, double[] in, int inOffset, double[] din, int dinOffset,
+			double[] dout, int doutOffset, double multiplier, int varIndex) {
 		if(order<=0){
 			throw new IllegalArgumentException("order must be positive");
 		}else if(order==1) {
 			for(int i=0; i<n; ++i)
-				din[varIndex] += " + "+multiplier+" "+in[i]+" "+dout[doutOffset+i];
+				din[varIndex] += dout[doutOffset+i]*in[i]*multiplier;
 			return n;
 		}else {
 			int count = 0;
 			for(int i=0; i<n; ++i) {
 				count+=diffApply(i+1, order-1, in, inOffset, din, dinOffset, 
-						dout, doutOffset+count, multiplier+" "+in[inOffset+i], varIndex);
+						dout, doutOffset+count, multiplier*in[inOffset+i], varIndex);
 			}
 			return count;
 
@@ -170,23 +216,27 @@ public class PolyInteractionString {
 	}
 
 	public static void main(String[] args) {
-		String[] vars= {
-				"a", "b", "c", "d"
+		double[] primes= {
+				2,3,5,7
 		};
-		String[] dsums = {
-				"0", "0", "0", "0"
-		};
-		String[] out = new String[100];
-		int n = apply(4, 2, 3, vars, 0, out, 0);
-		for(int i=0; i<n; ++i) {
-			out[i]="(ð"+out[i]+")";
-		}
+		double[] out = new double[100];
+		apply(4, 3, primes, 0, out, 0);
 		System.out.println(Arrays.toString(out));
-		diffApply(4, 2, 3, vars, 0, dsums, 0, out, 0);
-		System.out.println(dsums[0]);
-		System.out.println(dsums[1]);
-		System.out.println(dsums[2]);
-		System.out.println(dsums[3]);
 
+	}
+	public static long gcd(long a, long b) {
+		if(a<0)a=-a;
+		if(b<0)b=-b;
+		if(a>b) {
+			long t=a;
+			a=b;
+			b=t;
+		}
+		while(a!=0) {
+			long t = b%a;
+			b=a;
+			a=t;
+		}
+		return b;
 	}
 }

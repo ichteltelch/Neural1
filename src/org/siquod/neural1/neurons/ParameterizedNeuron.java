@@ -15,6 +15,10 @@ public abstract class ParameterizedNeuron {
 			public float df(float x) {
 				return ParameterizedNeuron.this.dfdx(x, a);
 			}
+			@Override
+			public String toString() {
+				return ParameterizedNeuron.this.toString()+"("+a+")";
+			}
 		};
 	}
 }

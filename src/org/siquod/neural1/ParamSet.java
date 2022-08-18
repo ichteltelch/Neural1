@@ -137,4 +137,9 @@ public final class ParamSet implements Cloneable{
 		for(int i=0; i<value.length; ++i)
 			value[i]*=f;
 	}
+	public void set(float[] params) {
+		if(params.length!=value.length)
+			throw new IllegalArgumentException("Cannot set parameters: length mismatch");
+		System.arraycopy(params, 0, value, 0, params.length);
+	}
 }

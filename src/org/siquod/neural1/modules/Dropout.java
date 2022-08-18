@@ -2,6 +2,7 @@ package org.siquod.neural1.modules;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 import org.siquod.neural1.ActivationBatch;
 import org.siquod.neural1.ActivationSeq;
@@ -17,17 +18,24 @@ import org.siquod.neural1.ParamSet;
 public class Dropout extends InOutCastLayer{
 	public float keepProbability;
 	public int dropoutOffset=-1;
-	public Dropout(Interface in2, double p) {
+	Random r;
+	public Dropout(Interface in2, double p, Random r) {
 		super(in2);
 		keepProbability=(float) p;
 		out=new Interface(in.count, in.tf);
 		out.offset=in.offset;
+		this.r=new Random(r.nextLong());
+
 	}
 	public static InOutCastFactory factory(final double keepProb){
+		return factory(keepProb, new Random());
+	}
+	public static InOutCastFactory factory(final double keepProb, Random rand){
+		Random r=new Random(rand.nextLong());
 		return new InOutCastFactory() {
 			@Override
 			public InOutCastLayer produce(Interface in) {
-				return new Dropout(in, keepProb);
+				return new Dropout(in, keepProb, r);
 			}
 		};
 	}
@@ -98,7 +106,8 @@ public class Dropout extends InOutCastLayer{
 	public void initializeRun(ActivationBatch as, boolean training) {
 		if(training)
 			for(ActivationSeq a: as.a)
-				a.sampleDropout(dropoutOffset, in.count, keepProbability);
+				a.sampleDropout(dropoutOffset, in.count, keepProbability, r);
+//				a.sampleDropout(dropoutOffset, in.count, keepProbability);
 	}
 	@Override
 	public Interface getIn() {

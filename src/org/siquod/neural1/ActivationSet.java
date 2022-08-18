@@ -61,6 +61,10 @@ public final class ActivationSet implements Cloneable{
 	public void get(Interface in, float[] output) {
 		System.arraycopy(value, in.offset, output, 0, in.count);	
 	}
+	public void add(Interface in, float[] addThis) {
+		for(int i=0; i<in.count; ++i)
+			value[in.offset+i]+=addThis[i];
+	}
 	public void setDecision(int i, int d) {
 		if(i==-1)
 			return;

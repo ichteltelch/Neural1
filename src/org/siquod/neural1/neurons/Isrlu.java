@@ -23,5 +23,8 @@ public class Isrlu extends ParameterizedNeuron{
 		float r = 1+a*q;
 		return q*x*0.5f/(r*(float)Math.sqrt(r));
 	}
-
+	@Override
+	public String toString() {
+		return "ISRLU";
+	}
 }

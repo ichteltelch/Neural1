@@ -1,8 +1,14 @@
-package org.siquod.neural1;
+package org.siquod.neural1.data;
 
 import java.util.Arrays;
 
-public class PolyInteraction {
+/**
+ * This class is a copy of {@link PolyInteraction} where doubles are replaced by Strings
+ * so as to verify that everything is correct.
+ * @author bb
+ *
+ */
+public class PolyInteractionString {
 
 	public static int simplexNumber(int n, int order) {
 		long num = n;
@@ -32,10 +38,10 @@ public class PolyInteraction {
 	 * 
 	 */
 
-	public static int apply(int n, int minOrder, int maxOrder, double[] in, int inOffset, double[] out, int outOffset) {
+	public static int apply(int n, int minOrder, int maxOrder, String[] in, int inOffset, String[] out, int outOffset) {
 		int count = 0;
 		for(int order = minOrder; order<=maxOrder; ++order) {
-			count+=apply(n, order, in, inOffset, out, outOffset+count, 1);
+			count+=apply(n, order, in, inOffset, out, outOffset+count, "");
 		}
 		return count;
 	}
@@ -54,22 +60,22 @@ public class PolyInteraction {
 	 * @return The number of results that were written to the outputs array, 
 	 * which will be {@link #simplexNumber(int, int) simplexNumber(n, order)}
 	 */
-	public static int apply(int n, int order, double[] in, int inOffset, double[] out, int outOffset) {
-		return apply(n, order, in, inOffset, out, outOffset, 1);
+	public static int apply(int n, int order, String[] in, int inOffset, String[] out, int outOffset) {
+		return apply(n, order, in, inOffset, out, outOffset, "");
 	}
 
-	private static int apply(int n, int order, double[] in, int inOffset, double[] out, int outOffset, double multiplier) {
+	private static int apply(int n, int order, String[] in, int inOffset, String[] out, int outOffset, String multiplier) {
 		if(order<=0) {
 			out[outOffset] = multiplier;
 			return 1;
 		}else if (order==1) {
 			for(int i=0; i<n; ++i)
-				out[outOffset+i] = in[inOffset+i]*multiplier;
+				out[outOffset+i] = multiplier+" "+in[inOffset+i];
 			return n;
 		}else {
 			int count = 0;
 			for(int i=0; i<n; ++i) {
-				count+=apply(i+1, order-1, in, inOffset, out, outOffset+count, multiplier*in[inOffset+i]);
+				count+=apply(i+1, order-1, in, inOffset, out, outOffset+count, multiplier+" "+in[inOffset+i]);
 			}
 			return count;
 		}
@@ -89,11 +95,11 @@ public class PolyInteraction {
 	 * which will be {@link #simplexNumber(int, int) simplexNumber(n, order)}
 	 */
 	public static int diffApply(int n, int minOrder, int maxOrder, 
-			double[] in, int inOffset, double[] din, int dinOffset,
-			double[] dout, int doutOffset) {
+			String[] in, int inOffset, String[] din, int dinOffset,
+			String[] dout, int doutOffset) {
 		int count = 0;
 		for(int order = minOrder; order<=maxOrder; ++order) {
-			count+=diffApply(n, order, in, inOffset, din, dinOffset, dout, doutOffset+count, 1);
+			count+=diffApply(n, order, in, inOffset, din, dinOffset, dout, doutOffset+count, "");
 		}
 		return count;
 	}
@@ -111,17 +117,17 @@ public class PolyInteraction {
 	 * @return The number of output gradients that were accessed, 
 	 * which will be {@link #simplexNumber(int, int) simplexNumber(n, order)}
 	 */
-	public static int diffApply(int n, int order, double[] in, int inOffset, double[] din, int dinOffset,
-			double[] dout, int doutOffset) {
-		return diffApply(n, order, in, inOffset, din, dinOffset, dout, doutOffset, 1);
+	public static int diffApply(int n, int order, String[] in, int inOffset, String[] din, int dinOffset,
+			String[] dout, int doutOffset) {
+		return diffApply(n, order, in, inOffset, din, dinOffset, dout, doutOffset, "");
 	}
-	static int diffApply(int n, int order, double[] in, int inOffset, double[] din, int dinOffset,
-			double[] dout, int doutOffset, double multiplier) {
+	static int diffApply(int n, int order, String[] in, int inOffset, String[] din, int dinOffset,
+			String[] dout, int doutOffset, String multiplier) {
 		if(order<=0){
 			throw new IllegalArgumentException("order must be positive");
 		}else if(order==1) {
 			for(int i=0; i<n; ++i)
-				din[dinOffset+i] += dout[doutOffset+i]*multiplier;
+				din[dinOffset+i] += " + " + multiplier + " " + dout[doutOffset+i];
 			return n;
 		}else {
 			{
@@ -135,7 +141,7 @@ public class PolyInteraction {
 				int count = 0;
 				for(int i=0; i<n; ++i) {
 					count+=diffApply(i+1, order-1, in, inOffset, din, dinOffset, 
-							dout, doutOffset+count, multiplier*in[inOffset+i]);
+							dout, doutOffset+count, multiplier+" "+in[inOffset+i]);
 				}
 				return count;
 			}
@@ -143,19 +149,19 @@ public class PolyInteraction {
 		}
 
 	}
-	static int diffApply(int n, int order, double[] in, int inOffset, double[] din, int dinOffset,
-			double[] dout, int doutOffset, double multiplier, int varIndex) {
+	static int diffApply(int n, int order, String[] in, int inOffset, String[] din, int dinOffset,
+			String[] dout, int doutOffset, String multiplier, int varIndex) {
 		if(order<=0){
 			throw new IllegalArgumentException("order must be positive");
 		}else if(order==1) {
 			for(int i=0; i<n; ++i)
-				din[varIndex] += dout[doutOffset+i]*in[i]*multiplier;
+				din[varIndex] += " + "+multiplier+" "+in[i]+" "+dout[doutOffset+i];
 			return n;
 		}else {
 			int count = 0;
 			for(int i=0; i<n; ++i) {
 				count+=diffApply(i+1, order-1, in, inOffset, din, dinOffset, 
-						dout, doutOffset+count, multiplier*in[inOffset+i], varIndex);
+						dout, doutOffset+count, multiplier+" "+in[inOffset+i], varIndex);
 			}
 			return count;
 
@@ -164,12 +170,23 @@ public class PolyInteraction {
 	}
 
 	public static void main(String[] args) {
-		double[] primes= {
-				2,3,5,7
+		String[] vars= {
+				"a", "b", "c", "d"
 		};
-		double[] out = new double[100];
-		apply(4, 3, primes, 0, out, 0);
+		String[] dsums = {
+				"0", "0", "0", "0"
+		};
+		String[] out = new String[100];
+		int n = apply(4, 2, 3, vars, 0, out, 0);
+		for(int i=0; i<n; ++i) {
+			out[i]="(ð"+out[i]+")";
+		}
 		System.out.println(Arrays.toString(out));
+		diffApply(4, 2, 3, vars, 0, dsums, 0, out, 0);
+		System.out.println(dsums[0]);
+		System.out.println(dsums[1]);
+		System.out.println(dsums[2]);
+		System.out.println(dsums[3]);
 
 	}
 }

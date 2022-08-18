@@ -19,6 +19,7 @@ import org.siquod.neural1.neurons.Tanh;
 public class LSTM implements InOutModule{
 
 
+
 	Interface c;
 	GateLayer g1;
 	GateLayer g2=new GateLayer();
@@ -57,6 +58,8 @@ public class LSTM implements InOutModule{
 		if(shift!=null)
 			shift=shift.clone();
 	}
+	
+	
 
 	@Override
 	public void allocate(InterfaceAllocator ia) {

@@ -13,4 +13,8 @@ public class L2Reg extends Regularizer{
 			gradients.add(index, eff*weights.get(index));
 		}
 	}
+	@Override
+	public String toString() {
+		return "L2("+strength+")";
+	}
 }

@@ -1,5 +1,7 @@
 package org.siquod.neural1;
 
+import java.util.Random;
+
 public class ActivationSeq implements Cloneable{
 	ActivationSet[] steps;
 	int[] dropoutMasks;
@@ -55,6 +57,12 @@ public class ActivationSeq implements Cloneable{
 		if(t>=end)
 			return null;
 		return steps[((t-begin)+start)%steps.length];
+	}
+	public void sampleDropout(int dropoutOffset, int dropoutCount, double keepProb, Random rand){
+		for(int j=0; j<dropoutCount; ++j){
+			dropoutMasks[dropoutOffset+j] = rand.nextDouble()<keepProb?1:0;
+//			dropoutMasks[dropoutOffset+j] = Math.random()<keepProb?1:0;
+		}
 	}
 	public void sampleDropout(int dropoutOffset, int dropoutCount, double keepProb){
 		for(int j=0; j<dropoutCount; ++j){
