@@ -61,7 +61,7 @@ public class FeedForward {
 		}
 		public double computeLoss(RandomAccess data) {
 			double[] inBuffer = new double[data.inputCount()];
-			double[] outBuffer = new double[data.inputCount()];
+			double[] outBuffer = new double[data.outputCount()];
 			float[] inBufferFloat = new float[inBuffer.length];
 			float[] outBufferFloat = new float[outBuffer.length];
 			data.reset();
@@ -92,7 +92,78 @@ public class FeedForward {
 			}
 			return lossSum/n;
 		}
+		public int[][] computeConfusion(RandomAccess data) {
+			int[][] ret = new int[data.outputCount()][data.outputCount()];
+			double[] inBuffer = new double[data.inputCount()];
+			double[] outBuffer = new double[data.outputCount()];
+			float[] inBufferFloat = new float[inBuffer.length];
+			float[] outBufferFloat = new float[outBuffer.length];
+			data.reset();
+			while(!data.isFinished()) {
+				data.giveInputs(inBuffer);
+				data.giveOutputs(outBuffer);
+				int correctOutput = 0;
+				{
+					double best = Double.NEGATIVE_INFINITY;
+					for(int i=0; i<outBuffer.length; ++i) {
+						double v = outBuffer[i];
+						if(v>best) {
+							correctOutput = i;
+							best = v;
+						}
+					}
+				}
+				for(int j=0; j<inBuffer.length; ++j)
+					inBufferFloat[j]=(float)inBuffer[j];
+				for(int j=0; j<outBuffer.length; ++j)
+					outBufferFloat[j]=(float)outBuffer[j];
+				
+				eval(inBufferFloat, outBufferFloat);
+				
+				int givenOutput = 0;
+				{
+					double best = Double.NEGATIVE_INFINITY;
+					for(int i=0; i<outBufferFloat.length; ++i) {
+						double v = outBufferFloat[i];
+						if(v>best) {
+							givenOutput = i;
+							best = v;
+						}
+					}
+				}
+				++ret[correctOutput][givenOutput];
+				data.next();
+
+			}
+			return ret;
+		}
 	}
+	public static String confusionMatrixToString(int[][] mat) {
+		StringBuilder t = new StringBuilder();
+		StringBuilder sb = new StringBuilder();
+		int[] columnWidth = new int[mat[0].length];
+		for(int[] row: mat) {
+			for(int i=0; i<row.length; ++i) {
+				int l = t.append(row[i]).length();
+				t.delete(0, l);
+				columnWidth[i] = Math.max(columnWidth[i], l);
+			}
+		}
+		for(int[] row: mat) {
+			for(int i=0; i<row.length; ++i) {
+				int l = t.append(row[i]).length();
+				t.delete(0, l);
+				for(int p=columnWidth[i] - l +1; p>=0; --p)
+					sb.append(' ');
+				sb.append(row[i]);
+			}
+			sb.append('\n');
+		}
+		
+		return sb.toString();
+	}
+	
+
 	public class NaiveTrainer implements Cloneable{
 		ParamSet ps=new ParamSet(paramCount);
 		ParamSet grad=new ParamSet(paramCount);

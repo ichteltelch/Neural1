@@ -8,6 +8,7 @@ package org.siquod.neural1.data;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 
 /**
  * A {@link TrainingBatchCursor} presents a sequence of training data items to a
@@ -66,10 +67,10 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 		RandomAccess clone();
 		/**
 		 * Split this cursor into several cursors that iterate over 
-		 * 
 		 * subsequences of approximately equal length
 		 * @param parts The number of subsequences to generate
 		 * @see #subsequence(long, long)
+		 * @see #split(double...)
 		 * @return
 		 */
 		default RandomAccess[] split(int parts) {
@@ -79,6 +80,43 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 				ret[part]=subsequence(((total*part)/parts), ((total*(part+1))/parts));
 			return ret;
 		}
+		/**
+		 * Split this cursor into several cursors that iterate over 
+		 * subsequences whose lengths are proportional to the given numbers
+		 * @param ratios The proportional length of each subsequence to generate
+		 * @see #subsequence(long, long)
+		 * @see #split(int)
+		 * @return
+		 */
+		default RandomAccess[] split(double... ratios){
+			RandomAccess[] ret = new RandomAccess[ratios.length];
+			double ratioSum=0;
+			for(int i=0; i<ratios.length; ++i)
+				ratioSum+=ratios[i];
+			long size = size();
+			double renorm = size/ratioSum;
+
+			long[] endIndices=new long[ratios.length];
+			{
+				double lastEndIndex=0;
+				for(int i=0; i<ratios.length; ++i) {
+					double nextEndIndex=lastEndIndex + renorm*ratios[i];
+					endIndices[i]=(int)Math.round(nextEndIndex);
+					lastEndIndex=nextEndIndex;
+				}
+				endIndices[ratios.length-1]=size;
+			}
+
+			long lastEndIndex=0;
+			for(int i=0; i<ratios.length; ++i) {
+				long nextEndIndex=endIndices[i];
+				RandomAccess relem = subsequence(lastEndIndex, nextEndIndex);
+				ret[i]=relem;
+				lastEndIndex=nextEndIndex;
+			}
+			return ret;
+		}
+		
 		/**
 		 * Create an independent cursor over the same data that is restricted to a 
 		 * subrange of the item indices of this one
@@ -524,10 +562,10 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 		int inputCount = eInp;
 		return new PolyInteractionCursor_RA(inputCount, order, back, bic);
 	}
-	public default RandomAccess ramBuffer() {
+	public default RamBuffer ramBuffer() {
 		return ramBuffer(this);
 	}
-	public static RandomAccess ramBuffer(TrainingBatchCursor of) {
+	public static RamBuffer ramBuffer(TrainingBatchCursor of) {
 		ArrayList<double[]> inputs=new ArrayList<>(); 
 		ArrayList<double[]> outputs=new ArrayList<>(); 
 		ArrayList<Double> weights=new ArrayList<>();
@@ -548,69 +586,101 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 		double[] ws = new double[weights.size()];
 		for(int i=0; i<ws.length; ++i)
 			ws[i]=weights.get(i);
-		class RamBuffer implements RandomAccess{
-			public RamBuffer(double[][] is2, double[][] os2, double[] ws2, int at2) {
-				is=is2;
-				os=os2;
-				ws=ws2;
-				at=at2;
-			}
-			final double[][] is, os;
-			final double[] ws;
-			int at;
-			@Override
-			public void next() {
-				++at;
-			}
-			@Override
-			public boolean isFinished() {
-				return at>=is.length;
-			}
-			@Override
-			public void reset() {
-				at=0;
-			}
-			@Override
-			public int inputCount() {
-				return ic;
-			}
-			@Override
-			public int outputCount() {
-				return oc;
-			}
-			@Override
-			public void giveInputs(double[] inputs) {
-				System.arraycopy(is[at], 0, inputs, 0, ic);
-			}
-			@Override
-			public void giveOutputs(double[] outputs) {
-				System.arraycopy(os[at], 0, outputs, 0, oc);
-			}
-			@Override
-			public double getWeight() {
-				return ws[at];
-			}
-			@Override
-			public long size() {
-				return is.length;
-			}
-			@Override
-			public void seek(long position) {
-				if(position<0 || position>=is.length)
-					throw new IndexOutOfBoundsException(String.valueOf(position));
-				at=(int) position;
-				
-			}
-			@Override
-			public RamBuffer clone() {
-				return new RamBuffer(is, os, ws, at);
-			}
+
+		return new RamBuffer(is, os, ws, 0, ic, oc);
+	}
+	public static class RamBuffer implements RandomAccess{
+		RamBuffer(double[][] is2, double[][] os2, double[] ws2, int at2, int ic, int oc) {
+			is=is2;
+			os=os2;
+			ws=ws2;
+			at=at2;
+			this.ic = ic;
+			this.oc = oc;
+		}
+		final int ic, oc;
+		final double[][] is, os;
+		final double[] ws;
+		int at;
+		@Override
+		public void next() {
+			++at;
+		}
+		@Override
+		public boolean isFinished() {
+			return at>=is.length;
+		}
+		@Override
+		public void reset() {
+			at=0;
+		}
+		@Override
+		public int inputCount() {
+			return ic;
+		}
+		@Override
+		public int outputCount() {
+			return oc;
+		}
+		@Override
+		public void giveInputs(double[] inputs) {
+			System.arraycopy(is[at], 0, inputs, 0, ic);
+		}
+		@Override
+		public void giveOutputs(double[] outputs) {
+			System.arraycopy(os[at], 0, outputs, 0, oc);
+		}
+		@Override
+		public double getWeight() {
+			return ws[at];
+		}
+		@Override
+		public long size() {
+			return is.length;
+		}
+		@Override
+		public void seek(long position) {
+			if(position<0 || position>=is.length)
+				throw new IndexOutOfBoundsException(String.valueOf(position));
+			at=(int) position;
 			
 		}
-		return new RamBuffer(is, os, ws, 0);
+		@Override
+		public RamBuffer clone() {
+			return new RamBuffer(is, os, ws, at, ic, oc);
+		}
+		/**
+		 * Shuffles the data in this RamBuffer and all its clones
+		 * @return
+		 */
+		public RamBuffer shuffle(Random rnd) {
+			int l = is.length;
+			for(int i=l-1; i>0; i--){
+				int sel=rnd.nextInt(i+1);
+				if(sel==i)
+					continue;
+				{
+					double[] t=is[i];
+					is[i]=is[sel];
+					is[sel]=t;
+				}
+				{
+					double[] t=os[i];
+					os[i]=os[sel];
+					os[sel]=t;
+				}
+				{
+					double t=ws[i];
+					ws[i]=ws[sel];
+					ws[sel]=t;
+				}
+			}
+			return this;
+		}
+		
 	}
 	@Override
-	default TrainingDataGiver whitened(Whitener whitenInputs, Whitener whitenOutputs) {
+	default TrainingBatchCursor whitened(Whitener whitenInputs, Whitener whitenOutputs) {
 		return new WhitenedTrainingBatchCursor<TrainingBatchCursor>(this, whitenInputs, whitenOutputs);
 	}
 	static public class WhitenedTrainingBatchCursor<B extends TrainingBatchCursor> 
