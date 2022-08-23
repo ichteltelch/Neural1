@@ -45,7 +45,7 @@ public final class TensorFormat {
 		for(int i=0; i<atIndex; ++i)
 			ndims[i] = dims[i];
 		ndims[atIndex] = 1;
-		for(int i=0; i<atIndex; ++i)
+		for(int i=atIndex; i<rank; ++i)
 			ndims[i+1] = dims[i];
 		return new TensorFormat(ndims);
 
