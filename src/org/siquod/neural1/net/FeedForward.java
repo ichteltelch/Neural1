@@ -14,7 +14,6 @@ import org.siquod.neural1.ParamAllocator;
 import org.siquod.neural1.ParamSet;
 import org.siquod.neural1.TensorFormat;
 import org.siquod.neural1.data.TrainingBatchCursor;
-import org.siquod.neural1.data.TrainingBatchCursor.RandomAccess;
 import org.siquod.neural1.modules.Dense;
 import org.siquod.neural1.modules.InOutModule;
 import org.siquod.neural1.modules.loss.LossLayer;
@@ -59,7 +58,7 @@ public class FeedForward {
 					r.append(((Dense) n).showParams(ps));
 			return r.toString();
 		}
-		public double computeLoss(RandomAccess data) {
+		public double computeLoss(TrainingBatchCursor data) {
 			double[] inBuffer = new double[data.inputCount()];
 			double[] outBuffer = new double[data.outputCount()];
 			float[] inBufferFloat = new float[inBuffer.length];
@@ -92,7 +91,7 @@ public class FeedForward {
 			}
 			return lossSum/n;
 		}
-		public int[][] computeConfusion(RandomAccess data) {
+		public int[][] computeConfusion(TrainingBatchCursor data) {
 			int[][] ret = new int[data.outputCount()][data.outputCount()];
 			double[] inBuffer = new double[data.inputCount()];
 			double[] outBuffer = new double[data.outputCount()];
