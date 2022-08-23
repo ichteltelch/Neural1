@@ -13,6 +13,7 @@ import org.siquod.neural1.Module;
 import org.siquod.neural1.ParamAllocator;
 import org.siquod.neural1.ParamBlocks;
 import org.siquod.neural1.ParamSet;
+import org.siquod.neural1.TensorFormat;
 
 /**
  * This layer computes the logarithmized softmax function of its input vector
@@ -21,10 +22,23 @@ import org.siquod.neural1.ParamSet;
  */
 public class LogSoftmax implements InOutModule{
 	Interface in, out;
+
+	TensorFormat tf;
+
+
 	@Override
 	public void allocate(InterfaceAllocator ia) {
 		in=ia.get("in");
 		out=ia.get("out", in.count);
+		if(!in.tf.equals(out.tf))
+			throw new IllegalArgumentException("Tensor formats don't match");
+		tf=in.tf;
+		while(tf.rank>2) {
+			tf = tf.flattenIndexAndNext(1);
+		}
+		if(tf.rank==1) {
+			tf = tf.insertUnitIndex(0);
+		}
 	}
 
 	@Override
@@ -48,29 +62,34 @@ public class LogSoftmax implements InOutModule{
 		if(inst!=null)
 			throw new IllegalThreadStateException("A "+getClass().getName()+" module must not be inside a convolution");
 
+		int n0 = tf.dims[0];
+		int n1 = tf.dims[1];
 		for(ActivationSeq b: as.a) {
 			if(b==null) continue;
 
 			ActivationSet a = b.get(t);
-			double sum = 0;
-			float max=Float.NEGATIVE_INFINITY;
-			for(int i=0; i<in.count; ++i){
-				float av = a.get(in, i);
-				if(av>max)
-					max=av;
-			}
-			for(int i=0; i<in.count; ++i){
-				double av = a.get(in, i);			
-				sum += Math.exp(av-max);
-			}
-			float logSum = (float) Math.log(sum);
-			for(int i=0; i<in.count; ++i){
-				if(a.get(out, i)!=0)
-					System.out.println();
-				//			check2+=Math.exp(a.get(in, i) - logSum);
-				float o = a.get(in, i) - max - logSum;
-				a.add(out, i, o);
-				//			check+=Math.exp(a.get(out, i));
+			for(int i0 = 0; i0<n0; ++i0) {
+				double sum = 0;
+				float max=Float.NEGATIVE_INFINITY;
+
+				for(int i=0; i<n1; ++i){
+					float av = a.get(in, tf.index(i0, i));
+					if(av>max)
+						max=av;
+				}
+				for(int i=0; i<n1; ++i){
+					double av = a.get(in, tf.index(i0, i));			
+					sum += Math.exp(av-max);
+				}
+				float logSum = (float) Math.log(sum);
+				for(int i=0; i<n1; ++i){
+					//				if(a.get(out, tf.index(i0, i))!=0)
+					//					System.out.println();
+					//			check2+=Math.exp(a.get(in, i) - logSum);
+					float o = a.get(in, tf.index(i0, i)) - max - logSum;
+					a.add(out, tf.index(i0, i), o);
+					//			check+=Math.exp(a.get(out, i));
+				}
 			}
 			//		System.out.println("check: "+check+" "+check2);
 		}
@@ -83,31 +102,35 @@ public class LogSoftmax implements InOutModule{
 		//    = sum_k (d L / d out_k)*(d (in_k - max - log (sum_j exp(in_j - max)))/(d in_i))
 		//    = sum_k (d L / d out_k)*(d (kronnecker_ik - (max==in_i?1:0) - (max==in_i?0:1)*(exp(in_i - max))/(sum_j exp(in_j - max))))
 		//    = (d L / d out_i) sum_k (d L / d out_k)*(-(max==in_i?1:0)- (max==in_i?0:1)*exp(in_i - max))/(sum_j exp(in_j - max))))
+		int n0 = tf.dims[0];
+		int n1 = tf.dims[1];
 		for(int b=0; b<as.length; ++b) {
 			if(errors.a[b]==null) continue;
 
 			ActivationSet a = as.a[b].get(t);
 			ActivationSet e = errors.a[b].get(t);
-			float odSum=0;
-			float sum = 0;
-			double max=Double.NEGATIVE_INFINITY;
-			int maxi=-1;
-			for(int i=0; i<in.count; ++i){
-				double av = a.get(in, i);
-				if(av>max){
-					max=av;
-					maxi=i;
+			for(int i0 = 0; i0<n0; ++i0) {
+				float odSum=0;
+				float sum = 0;
+				double max=Double.NEGATIVE_INFINITY;
+				int maxi=-1;
+				for(int i=0; i<in.count; ++i){
+					double av = a.get(in, tf.index(i0, i));
+					if(av>max){
+						max=av;
+						maxi=i;
+					}
 				}
-			}
-			for(int i=0; i<in.count; ++i){
-				odSum+=e.get(out, i);
-				sum += Math.exp(a.get(in, i) - max);		
-			}
-			for(int i=0; i<in.count; i++){
-				if(false && i==maxi){
-					e.add(in, i, e.get(out, i) - odSum );
-				}else{
-					e.add(in, i, e.get(out, i) - odSum * (float)Math.exp(a.get(in, i) - max)/sum );
+				for(int i=0; i<in.count; ++i){
+					odSum+=e.get(out, i);
+					sum += Math.exp(a.get(in, tf.index(i0, i)) - max);		
+				}
+				for(int i=0; i<in.count; i++){
+					if(false && i==maxi){
+						e.add(in, i, e.get(out, tf.index(i0, i)) - odSum );
+					}else{
+						e.add(in, i, e.get(out, tf.index(i0, i)) - odSum * (float)Math.exp(a.get(in, tf.index(i0, i)) - max)/sum );
+					}
 				}
 			}
 		}
@@ -115,16 +138,16 @@ public class LogSoftmax implements InOutModule{
 
 
 
-////	@Override
-//	public void declareDependencies(Dependencies d) {
-//		d.declare(new InputDependency(in, this, 0));
-//		d.declare(new OutputDependency(this, out));
-//	}
+	////	@Override
+	//	public void declareDependencies(Dependencies d) {
+	//		d.declare(new InputDependency(in, this, 0));
+	//		d.declare(new OutputDependency(this, out));
+	//	}
 
 	@Override
 	public void dontComputeInPhase(String phase) {		
 	}
-//	@Override
+	//	@Override
 	public boolean wouldBackprop(String phase) {
 		return true;
 	}

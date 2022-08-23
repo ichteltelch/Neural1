@@ -1,10 +1,13 @@
 package org.siquod.neural1;
 
+import java.util.Arrays;
+
 public final class TensorFormat {
-	public int rank;
-	public int[] dims;
+	public final int rank;
+	public final int[] dims;
 	public TensorFormat(int... dims){
-		this.dims=dims;
+		this.dims = dims;
+		this.rank = dims.length;
 	}
 	public int index(int i0){
 		if(i0<0 || i0>=dims[0])
@@ -17,6 +20,35 @@ public final class TensorFormat {
 		if(i1<0 || i1>=dims[1])
 			return -1;
 		return i0 + dims[0]*i1;
+	}
+	public TensorFormat flattenIndexAndNext(int firstIndex) {
+		if(firstIndex<0)
+			throw new IllegalArgumentException("index must be positive");
+		if(firstIndex>=rank)
+			throw new IllegalArgumentException("index must be less than rank");
+		if(firstIndex==rank-1)
+			throw new IllegalArgumentException("index must not be the last one");
+		int[] ndims = new int[rank-1];
+		for(int i=0; i<firstIndex; ++i)
+			ndims[i] = dims[i];
+		ndims[firstIndex] = dims[firstIndex]*dims[firstIndex+1];
+		for(int i=firstIndex+1; i<rank; ++i)
+			ndims[i-1] = dims[i];
+		return new TensorFormat(ndims);
+	}
+	public TensorFormat insertUnitIndex(int atIndex) {
+		if(atIndex<0)
+			throw new IllegalArgumentException("index must be positive");
+		if(atIndex>rank)
+			throw new IllegalArgumentException("index must not be greater than rank");
+		int[] ndims = new int[rank+1];
+		for(int i=0; i<atIndex; ++i)
+			ndims[i] = dims[i];
+		ndims[atIndex] = 1;
+		for(int i=0; i<atIndex; ++i)
+			ndims[i+1] = dims[i];
+		return new TensorFormat(ndims);
+
 	}
 	public int index(int i0, int i1, int i2){
 		if(i0<0 || i0>=dims[0])
@@ -168,6 +200,22 @@ public final class TensorFormat {
 		int[] ni=dims.clone();
 		ni[ni.length-1]=i;
 		return new TensorFormat(ni);
+	}
+	@Override
+	public boolean equals(Object o) {
+		if (o == this)
+			return true;
+		if (o == null)
+			return false;
+		if (o instanceof TensorFormat) {
+			TensorFormat a = (TensorFormat) o;
+			return Arrays.equals(dims, a.dims);
+		}
+		return false;
+	}
+	@Override
+	public int hashCode() {
+		return Arrays.hashCode(dims);
 	}
 	
 }
