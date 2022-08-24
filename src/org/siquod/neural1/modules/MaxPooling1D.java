@@ -64,7 +64,7 @@ public class MaxPooling1D implements InOutModule{
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst) {
 		if(inst!=null)
 			throw new IllegalThreadStateException("A "+getClass().getName()+" module must not be inside a convolution");
-		for(ActivationSeq b: as.a) {
+		for(ActivationSeq b: as) {
 			ActivationSet ia=b.get(t);
 			ActivationSet oa=ia;
 			for(int i=outf.dims[1]-1, odec=0; i>=0; --i) {

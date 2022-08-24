@@ -57,7 +57,7 @@ public class Nonlin implements InOutModule{
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] pos) {
 		if(pos==null) {
 			int incount = in.count;
-			for(ActivationSeq b: as.a) {
+			for(ActivationSeq b: as) {
 				if(b==null) continue;
 
 				ActivationSet a=b.get(t);
@@ -66,7 +66,7 @@ public class Nonlin implements InOutModule{
 			}
 		}else {
 			int incount = in.channels();
-			for(ActivationSeq b: as.a) {
+			for(ActivationSeq b: as) {
 				if(b==null) continue;
 
 				ActivationSet a=b.get(t);

@@ -60,7 +60,7 @@ public class Maxout implements InOutModule{
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst) {
 		if(inst==null) {
 			int outcount=out.count;
-			for(ActivationSeq b: as.a) {
+			for(ActivationSeq b: as) {
 				if(b==null) continue;
 				ActivationSet a=b.get(t);
 				for(int o=0; o<outcount; ++o){
@@ -80,7 +80,7 @@ public class Maxout implements InOutModule{
 		}else {
 			int outcount=out.channels();
 			int[] pos=inst;
-			for(ActivationSeq b: as.a) {
+			for(ActivationSeq b: as) {
 				if(b==null) continue;
 				ActivationSet a=b.get(t);
 				for(int o=0; o<outcount; ++o){

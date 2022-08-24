@@ -40,7 +40,7 @@ public class GaussianNllLoss extends LossLayer{
 	}
 	@Override
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch ass, int t, int[] inst) {
-		for(ActivationSeq as: ass.a) {
+		for(ActivationSeq as: ass) {
 			ActivationSet a=as.get(t);
 			float r = 0;
 			for(int i=0, ti=0; i<in.count; i+=2, ++ti){

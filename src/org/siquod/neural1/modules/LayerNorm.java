@@ -84,7 +84,7 @@ public class LayerNorm implements InOutScaleBiasModule{
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst) {
 		if(inst==null) {
 			int incount = in.count;
-			for(ActivationSeq b: as.a) {
+			for(ActivationSeq b: as) {
 				if(b==null)continue;
 				ActivationSet a=b.get(t);
 				if(a==null) continue;
@@ -111,7 +111,7 @@ public class LayerNorm implements InOutScaleBiasModule{
 			}
 		}else { 
 			int incount = in.channels();
-			for(ActivationSeq b: as.a) {
+			for(ActivationSeq b: as) {
 				if(b==null)continue;
 				ActivationSet a=b.get(t);
 				if(a==null) continue;

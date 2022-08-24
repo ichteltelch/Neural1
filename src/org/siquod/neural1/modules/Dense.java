@@ -153,7 +153,7 @@ public class Dense implements InOutBiasModule{
 		}
 		if(par==1) {
 			int startA = 0;
-			int endA = as.a.length;
+			int endA = as.length;
 			int startO = 0;
 			int endO = outcount;
 			if(inst==null) {
@@ -163,7 +163,7 @@ public class Dense implements InOutBiasModule{
 				forwardSlice(params, as, t, poso, incount, outcount, startA, endA, startO, endO);
 			}
 		}else {
-			int taskCount = Math.min(par*4, as.a.length);
+			int taskCount = Math.min(par*4, as.length);
 			AtomicInteger done = new AtomicInteger();
 			ArrayList<Future<?>> workers = new ArrayList<>(par);
 			try {
@@ -173,8 +173,8 @@ public class Dense implements InOutBiasModule{
 							int task = done.getAndAdd(1);
 							if(task>=taskCount)
 								return;
-							int startA = task * as.a.length / taskCount;
-							int endA = (task+1) * as.a.length / taskCount;
+							int startA = task * as.length / taskCount;
+							int endA = (task+1) * as.length / taskCount;
 							int startO = 0;
 							int endO = outcount;
 							if(inst==null) {
@@ -306,7 +306,7 @@ public class Dense implements InOutBiasModule{
 		}
 		if(par==1) {
 			int startA = 0;
-			int endA = as.a.length;
+			int endA = as.length;
 			int startI = 0;
 			int endI = incount;
 			if(inst==null) {
@@ -316,7 +316,7 @@ public class Dense implements InOutBiasModule{
 				backPropSlice(params, errors, t, incount, outcount, poso, startA, endA, startI, endI);
 			}
 		}else {
-			int taskCount = Math.min(par*4, as.a.length);
+			int taskCount = Math.min(par*4, as.length);
 			AtomicInteger done = new AtomicInteger();
 			ArrayList<Future<?>> workers = new ArrayList<>(par);
 			try {
@@ -326,8 +326,8 @@ public class Dense implements InOutBiasModule{
 							int task = done.getAndAdd(1);
 							if(task>=taskCount)
 								return;
-							int startA = task * as.a.length / taskCount;
-							int endA = (task+1) * as.a.length / taskCount;
+							int startA = task * as.length / taskCount;
+							int endA = (task+1) * as.length / taskCount;
 							int startI = 0;
 							int endI = incount;
 							if(inst==null) {

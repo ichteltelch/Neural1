@@ -52,7 +52,7 @@ public class NllLoss extends LossLayer{
 
 	@Override
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch ass, int t, int[] inst) {
-		for(ActivationSeq as: ass.a) {
+		for(ActivationSeq as: ass) {
 			ActivationSet a=as.get(t);
 			float r = 0;
 			for(int i=0; i<in.count; i++){

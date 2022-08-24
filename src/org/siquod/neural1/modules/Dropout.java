@@ -63,7 +63,7 @@ public class Dropout extends InOutCastLayer{
 		if(inst!=null)
 			throw new IllegalArgumentException("A "+getClass().getName()+" module must not be inside a convolution");
 		if(training==ForwardPhase.TRAINING){
-			for(ActivationSeq ab: as.a) {
+			for(ActivationSeq ab: as) {
 				if(ab==null) continue;
 				ActivationSet a=ab.get(t);
 				for(int i=0; i<in.count; ++i){
@@ -72,7 +72,7 @@ public class Dropout extends InOutCastLayer{
 
 			}
 		}else{
-			for(ActivationSeq ab: as.a) {
+			for(ActivationSeq ab: as) {
 				if(ab==null) continue;
 				ActivationSet a=ab.get(t);
 				for(int i=0; i<in.count; ++i){
@@ -105,7 +105,7 @@ public class Dropout extends InOutCastLayer{
 	@Override
 	public void initializeRun(ActivationBatch as, boolean training) {
 		if(training)
-			for(ActivationSeq a: as.a)
+			for(ActivationSeq a: as)
 				a.sampleDropout(dropoutOffset, in.count, keepProbability, r);
 //				a.sampleDropout(dropoutOffset, in.count, keepProbability);
 	}

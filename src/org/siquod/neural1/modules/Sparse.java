@@ -153,7 +153,7 @@ public class Sparse implements InOutBiasModule{
 			int fincount = (int)(incount*filling);
 
 			int outcount = out.count;
-			for(ActivationSeq a: as.a) {
+			for(ActivationSeq a: as) {
 				if(a==null) continue;
 				ActivationSet oa = a.get(t);
 				ActivationSet ia = a.get(t+dt);
@@ -198,7 +198,7 @@ public class Sparse implements InOutBiasModule{
 			int outcount = out.channels();
 			int fincount = (int)(incount*filling);
 
-			for(ActivationSeq a: as.a) {
+			for(ActivationSeq a: as) {
 				if(a==null) continue;
 				ActivationSet oa = a.get(t);
 				ActivationSet ia = a.get(t+dt);

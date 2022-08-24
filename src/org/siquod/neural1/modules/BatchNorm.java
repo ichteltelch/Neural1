@@ -82,7 +82,7 @@ public class BatchNorm implements InOutScaleBiasModule {
 				for(int i=0; i<in.count; ++i) {
 					float mean=0;
 					int count=0;
-					for(ActivationSeq b: as.a) {
+					for(ActivationSeq b: as) {
 						if(b==null)
 							continue;
 						mean+=b.get(t).get(in, i);
@@ -90,7 +90,7 @@ public class BatchNorm implements InOutScaleBiasModule {
 					}
 					mean/=count;
 					float var = 0;
-					for(ActivationSeq b: as.a) {
+					for(ActivationSeq b: as) {
 						if(b==null)
 							continue;
 						float d = b.get(t).get(in, i) - mean;
@@ -111,7 +111,7 @@ public class BatchNorm implements InOutScaleBiasModule {
 //						System.out.println("add = "+addVal+", mult = "+multVal);
 //					}
 					//					System.out.println(" (x - "+mean+") * "+scal+" * "+multVal+" + "+addVal);
-					for(ActivationSeq b: as.a) {
+					for(ActivationSeq b: as) {
 						if(b==null)
 							continue;
 						ActivationSet a = b.get(t);
@@ -121,7 +121,7 @@ public class BatchNorm implements InOutScaleBiasModule {
 					}
 				}
 			}else {
-				for(ActivationSeq b: as.a) {
+				for(ActivationSeq b: as) {
 					if(b==null)
 						continue;
 					for(int i=0; i<in.count; ++i) {

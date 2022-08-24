@@ -63,7 +63,7 @@ public class PolyInteractionModule implements InOutModule{
 	}
 	@Override
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst) {
-		for(ActivationSeq a: as.a) {
+		for(ActivationSeq a: as) {
 			if(a==null) continue;
 			ActivationSet ia=a.get(t);
 			if(ia==null)

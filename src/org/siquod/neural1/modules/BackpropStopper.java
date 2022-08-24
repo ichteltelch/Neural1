@@ -65,7 +65,7 @@ public class BackpropStopper extends InOutCastLayer{
 	public void backprop(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, int t, int[] inst) {
 		if(!backprop.test(phase)){
 			if(inst==null) {
-				for(ActivationSeq a: errors.a)
+				for(ActivationSeq a: errors)
 					if(a!=null) {
 						ActivationSet aa = a.get(t+dt);
 						if(aa!=null)
@@ -77,7 +77,7 @@ public class BackpropStopper extends InOutCastLayer{
 					Module.add(inst, shift, pos=posi);
 				else
 					pos=inst;
-				for(ActivationSeq a: errors.a)
+				for(ActivationSeq a: errors)
 					if(a!=null) {
 						ActivationSet aa = a.get(t+dt);
 						if(aa!=null)

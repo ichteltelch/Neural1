@@ -132,7 +132,7 @@ public class Conv2D implements InOutBiasModule{
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst) {
 		if(inst!=null)
 			throw new IllegalArgumentException("A "+getClass().getName()+" module must not be inside a convolution");
-		for(ActivationSeq b: as.a) {
+		for(ActivationSeq b: as) {
 			if(b==null) continue;
 			ActivationSet oa = b.get(t);
 			ActivationSet ia = b.get(t+dt);

@@ -59,7 +59,7 @@ public class BiasLayer extends InOutCastLayer implements HasBias{
 		if(inst==null) {
 			if(in.tf.rank>1) {
 				int stride = in.tf.channelStride();
-				for(ActivationSeq ab: as.a) {
+				for(ActivationSeq ab: as) {
 					ActivationSet a=ab.get(t);
 					for(int c=0; c<incount; ++c) {
 						int o=stride*c;
@@ -70,7 +70,7 @@ public class BiasLayer extends InOutCastLayer implements HasBias{
 					}
 				}
 			}else {
-				for(ActivationSeq ab: as.a) {
+				for(ActivationSeq ab: as) {
 					ActivationSet a=ab.get(t);
 					for(int c=0; c<incount; ++c) {
 						float b=params.get(bias, c);
@@ -80,7 +80,7 @@ public class BiasLayer extends InOutCastLayer implements HasBias{
 			}
 		}else{
 			int stride = in.tf.channelStride();
-			for(ActivationSeq ab: as.a) {
+			for(ActivationSeq ab: as) {
 				ActivationSet a=ab.get(t);
 				int i = in.tf.index(inst, 0);
 				for(int c=0; c<incount; ++c) {

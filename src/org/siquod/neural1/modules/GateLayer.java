@@ -83,7 +83,7 @@ public class GateLayer implements Module{
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst) {
 		if(inst==null) {
 			int incount = in1.count;
-			for(ActivationSeq a: as.a) {
+			for(ActivationSeq a: as) {
 				if(a==null) continue;
 
 				ActivationSet a1=a.get(t+dt1);
@@ -111,7 +111,7 @@ public class GateLayer implements Module{
 
 			int[] poso=inst;
 			int incount = in1.channels();
-			for(ActivationSeq a: as.a) {
+			for(ActivationSeq a: as) {
 				if(a==null) continue;
 
 				ActivationSet a1=a.get(t+dt1);

@@ -65,7 +65,7 @@ public class StochasticPooling1D implements InOutModule{
 		if(inst!=null)
 			throw new IllegalThreadStateException("A "+getClass().getName()+" module must not be inside a convolution");
 		if(training==ForwardPhase.TRAINING) {
-			for(ActivationSeq b: as.a) {
+			for(ActivationSeq b: as) {
 				ActivationSet ia=b.get(t);
 				ActivationSet oa=ia;
 				for(int i=outf.dims[1]-1, odec=0; i>=0; --i) {
@@ -101,7 +101,7 @@ public class StochasticPooling1D implements InOutModule{
 				}
 			}
 		}else {
-			for(ActivationSeq b: as.a) {
+			for(ActivationSeq b: as) {
 				ActivationSet ia=b.get(t);
 				ActivationSet oa=ia;
 				for(int i=outf.dims[1]-1; i>=0; --i) {

@@ -64,7 +64,7 @@ public class LogSoftmax implements InOutModule{
 
 		int n0 = tf.dims[0];
 		int n1 = tf.dims[1];
-		for(ActivationSeq b: as.a) {
+		for(ActivationSeq b: as) {
 			if(b==null) continue;
 
 			ActivationSet a = b.get(t);

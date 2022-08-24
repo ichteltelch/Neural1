@@ -117,7 +117,7 @@ public class Conv1D implements InOutBiasModule{
 
 		if(inst!=null)
 			throw new IllegalArgumentException("A "+getClass().getName()+" module must not be inside a convolution");
-		for(ActivationSeq b: as.a) {
+		for(ActivationSeq b: as) {
 			if(b==null) continue;
 			ActivationSet oa = b.get(t);
 			ActivationSet ia = b.get(t+dt);

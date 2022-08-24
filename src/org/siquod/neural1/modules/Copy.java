@@ -79,7 +79,7 @@ public class Copy implements InOutModule{
 			if(shift!=null)
 				throw new IllegalArgumentException("This "+getClass().getName()+" module must be inside a convolution");
 
-			for(ActivationSeq a: as.a) {
+			for(ActivationSeq a: as) {
 				if(a==null) continue;
 				ActivationSet ia=a.get(t+dt);
 				if(ia==null)
@@ -96,7 +96,7 @@ public class Copy implements InOutModule{
 			else
 				Module.add(inst, shift, posi);
 			int[] poso=inst;
-			for(ActivationSeq a: as.a) {
+			for(ActivationSeq a: as) {
 				if(a==null) continue;
 				ActivationSet ia=a.get(t+dt);
 				if(ia==null)
