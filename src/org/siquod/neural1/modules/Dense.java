@@ -1,8 +1,14 @@
 package org.siquod.neural1.modules;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.siquod.neural1.ActivationBatch;
 import org.siquod.neural1.ActivationSeq;
@@ -38,6 +44,9 @@ public class Dense implements InOutBiasModule{
 	//	boolean useResidual;
 	int dt;
 	Regularizer reg;
+
+	int par = 1;
+
 	public Dense(){
 		this(true, 0, null);
 	}
@@ -124,91 +133,153 @@ public class Dense implements InOutBiasModule{
 		return ret;
 	}
 
+	public static final ExecutorService parallelizer = Executors.newCachedThreadPool(); 
 	@Override
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst) {
+		int incount;
+		int outcount;
 		if(inst==null) {
 			if(shift!=null)
 				throw new IllegalArgumentException("This "+getClass().getName()+" module must be inside a convolution");
-			int incount = in.count;
-			int outcount = out.count;
-			for(ActivationSeq a: as.a) {
-				if(a==null) continue;
-				ActivationSet oa = a.get(t);
-				ActivationSet ia = a.get(t+dt);
-				if(ia!=null){
-					for(int i=incount-1, w=weights.count-1; i>=0; --i){
-						float input = ia.get(in, i);
-						if(input==0) {
-							w -= outcount;
-							continue;
-						}
-						for(int o=outcount-1; o>=0; --o, --w){
-							oa.add(out, o, input * params.get(weights, w));
-						}
-
-					}
-				}
-				//		if(useResidual){
-				//			for(int o=out.count-1; o>=0; --o){
-				//				oa.add(out, o, ia.get(in, o));
-				//			}
-				//		}
-				if(useBias){
-					for(int o=outcount-1; o>=0; --o){
-						oa.add(out, o, params.get(bias, o));
-					}
-				}
-				for(int i=0; i<coordinateBias.length; ++i) {
-					ParamBlock bias=coordinateBias[i];
-					if(bias!=null) {
-						float activation = coordinateActivations[i];
-						for(int o=outcount-1; o>=0; --o){
-							oa.add(out, o, activation*params.get(bias, o));
-						}
-					}
-				}
-			}		
+			incount = in.count;
+			outcount = out.count;
 		}else {
 			if(shift==null)
 				Module.copy(inst, posi);
 			else
 				Module.add(inst, shift, posi);
-			int[] poso=inst;
-			int incount = in.channels();
-			int outcount = out.channels();
-			for(ActivationSeq a: as.a) {
-				if(a==null) continue;
-				ActivationSet oa = a.get(t);
-				ActivationSet ia = a.get(t+dt);
-				if(ia!=null){
-					for(int i=incount-1, w=weights.count-1; i>=0; --i){
-						float input = ia.get(in, posi, i);
-						if(input==0) {
-							w -= outcount;
-							continue;
+			incount = in.channels();
+			outcount = out.channels();
+		}
+		if(par==1) {
+			int startA = 0;
+			int endA = as.a.length;
+			int startO = 0;
+			int endO = outcount;
+			if(inst==null) {
+				forwardSlice(params, as, t, incount, outcount, startA, endA, startO, endO);		
+			}else {
+				int[] poso=inst;
+				forwardSlice(params, as, t, poso, incount, outcount, startA, endA, startO, endO);
+			}
+		}else {
+			int taskCount = Math.min(par*4, as.a.length);
+			AtomicInteger done = new AtomicInteger();
+			ArrayList<Future<?>> workers = new ArrayList<>(par);
+			try {
+				for(int i=0; i<par; ++i) {
+					workers.add(parallelizer.submit(()->{
+						while(true) {
+							int task = done.getAndAdd(1);
+							if(task>=taskCount)
+								return;
+							int startA = task * as.a.length / taskCount;
+							int endA = (task+1) * as.a.length / taskCount;
+							int startO = 0;
+							int endO = outcount;
+							if(inst==null) {
+								forwardSlice(params, as, t, incount, outcount, startA, endA, startO, endO);		
+							}else {
+								int[] poso=inst;
+								forwardSlice(params, as, t, poso, incount, outcount, startA, endA, startO, endO);
+							}
 						}
-						for(int o=outcount-1; o>=0; --o, --w){
-							oa.add(out, poso, o, input * params.get(weights, w));
-						}
+					}));
+				}
+				joinAll(workers);
+
+			}finally {
+				for(Future<?> f: workers)
+					f.cancel(true);
+			}
+		}
+	}
+	private void joinAll(ArrayList<Future<?>> workers) {
+		try {
+			for(Future<?> f: workers) 
+				f.get();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} catch (ExecutionException e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
+	}
+	private void forwardSlice(ParamSet params, ActivationBatch as, int t, int incount, int outcount, int startA,
+			int endA, int startO, int endO) {
+		for(int ai = startA; ai<endA; ++ai) {
+			ActivationSeq a = as.a[ai];
+			if(a==null) continue;
+			ActivationSet oa = a.get(t);
+			ActivationSet ia = a.get(t+dt);
+			if(ia!=null){
+				for(int i=incount-1; i>=0; --i){
+					float input = ia.get(in, i);
+					if(input==0) {
+						continue;
+					}
+					for(int o=endO-1; o>=startO; --o){
+						int w = o + i * outcount;
+						oa.add(out, o, input * params.get(weights, w));
 					}
 				}
-				//		if(useResidual){
-				//			for(int o=out.count-1; o>=0; --o){
-				//				oa.add(out, o, ia.get(in, o));
-				//			}
-				//		}
-				if(useBias){
-					for(int o=outcount-1; o>=0; --o){
-						oa.add(out, poso, o, params.get(bias, o));
+			}
+			//		if(useResidual){
+			//			for(int o=out.count-1; o>=0; --o){
+			//				oa.add(out, o, ia.get(in, o));
+			//			}
+			//		}
+			if(useBias){
+				for(int o=endO-1; o>=startO; --o){
+					oa.add(out, o, params.get(bias, o));
+				}
+			}
+			for(int i=0; i<coordinateBias.length; ++i) {
+				ParamBlock bias=coordinateBias[i];
+				if(bias!=null) {
+					float activation = coordinateActivations[i];
+					for(int o=endO-1; o>=startO; --o){
+						oa.add(out, o, activation*params.get(bias, o));
 					}
 				}
-				for(int i=0; i<coordinateBias.length; ++i) {
-					ParamBlock bias=coordinateBias[i];
-					if(bias!=null) {
-						float activation = coordinateActivations[i];
-						for(int o=outcount-1; o>=0; --o){
-							oa.add(out, poso, o, activation*params.get(bias, o));
-						}
+			}
+		}
+	}
+	private void forwardSlice(ParamSet params, ActivationBatch as, int t, int[] poso, int incount, int outcount,
+			int startA, int endA, int startO, int endO) {
+		for(int ai = startA; ai<endA; ++ai) {
+			ActivationSeq a = as.a[ai];
+			if(a==null) continue;
+			ActivationSet oa = a.get(t);
+			ActivationSet ia = a.get(t+dt);
+			if(ia!=null){
+				for(int i=incount-1; i>=0; --i){
+					float input = ia.get(in, posi, i);
+					if(input==0) {
+						continue;
+					}
+					for(int o=endO-1; o>=startO; --o){
+						int w = o + i * outcount;
+						oa.add(out, poso, o, input * params.get(weights, w));
+					}
+				}
+			}
+			//		if(useResidual){
+			//			for(int o=out.count-1; o>=0; --o){
+			//				oa.add(out, o, ia.get(in, o));
+			//			}
+			//		}
+			if(useBias){
+				for(int o=endO-1; o>=startO; --o){
+					oa.add(out, poso, o, params.get(bias, o));
+				}
+			}
+			for(int i=0; i<coordinateBias.length; ++i) {
+				ParamBlock bias=coordinateBias[i];
+				if(bias!=null) {
+					float activation = coordinateActivations[i];
+					for(int o=endO-1; o>=startO; --o){
+						oa.add(out, poso, o, activation*params.get(bias, o));
 					}
 				}
 			}
@@ -219,114 +290,201 @@ public class Dense implements InOutBiasModule{
 	public void backprop(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, int t, int[] inst) {	
 		if(dontBackprop.contains(phase))
 			return;
+		int incount;
+		int outcount;
 		if(inst==null) {
-			int incount = in.count;
-			int outcount = out.count;
-			for(int b=0; b<as.length; ++b) {
-				if(errors.a[b]==null) continue;
-				ActivationSet inErr = errors.a[b].get(t+dt);
-				if(inErr==null)
-					continue;
-				ActivationSet outErr = errors.a[b].get(t);
-				if(outErr==null)
-					continue;
-				for(int i=incount-1, w=weights.count-1; i>=0; --i){
-					float ie = 0;
-					for(int o=outcount-1; o>=0; --o, --w){
-						ie += outErr.get(out, o)*params.get(weights, w);
-					}
-					//			if(useResidual){
-					//				ie += outErr.get(out, i);
-					//			}
-					inErr.add(in, i, ie);
-				}
+			incount = in.count;
+			outcount = out.count;
+		}else {
+			if(shift==null)
+				;
+			else
+				Module.add(inst, shift, posi);
+
+			incount = in.channels();
+			outcount = out.channels();
+		}
+		if(par==1) {
+			int startA = 0;
+			int endA = as.a.length;
+			int startI = 0;
+			int endI = incount;
+			if(inst==null) {
+				packPropSlice(params, errors, t, incount, outcount, startA, endA, startI, endI);
+			}else {
+				int[] poso=inst;
+				backPropSlice(params, errors, t, incount, outcount, poso, startA, endA, startI, endI);
 			}
 		}else {
-			Module.add(inst, shift, posi);
-			int[] poso=inst;
-			int incount = in.channels();
-			int outcount = out.channels();
-			for(int b=0; b<as.length; ++b) {
-				if(errors.a[b]==null) continue;
-				ActivationSet inErr = errors.a[b].get(t+dt);
-				if(inErr==null)
-					continue;
-				ActivationSet outErr = errors.a[b].get(t);
-				if(outErr==null)
-					continue;
-				for(int i=incount-1, w=weights.count-1; i>=0; --i){
-					float ie = 0;
-					for(int o=outcount-1; o>=0; --o, --w){
-						ie += outErr.get(out, poso, o)*params.get(weights, w);
-					}
-					//			if(useResidual){
-					//				ie += outErr.get(out, i);
-					//			}
-					inErr.add(in, posi, i, ie);
+			int taskCount = Math.min(par*4, as.a.length);
+			AtomicInteger done = new AtomicInteger();
+			ArrayList<Future<?>> workers = new ArrayList<>(par);
+			try {
+				for(int i=0; i<par; ++i) {
+					workers.add(parallelizer.submit(()->{
+						while(true) {
+							int task = done.getAndAdd(1);
+							if(task>=taskCount)
+								return;
+							int startA = task * as.a.length / taskCount;
+							int endA = (task+1) * as.a.length / taskCount;
+							int startI = 0;
+							int endI = incount;
+							if(inst==null) {
+								packPropSlice(params, errors, t, incount, outcount, startA, endA, startI, endI);
+							}else {
+								int[] poso=inst;
+								backPropSlice(params, errors, t, incount, outcount, poso, startA, endA, startI, endI);
+							}
+						}
+					}));
 				}
+				joinAll(workers);
+
+			}finally {
+				for(Future<?> f: workers)
+					f.cancel(true);
 			}
 		}
 	}
-	
-	
-	
+	private void backPropSlice(ParamSet params, ActivationBatch errors, int t, int incount, int outcount, int[] poso,
+			int startA, int endA, int startI, int endI) {
+		for(int b=startA; b<endA; ++b) {
+			if(errors.a[b]==null) continue;
+			ActivationSet inErr = errors.a[b].get(t+dt);
+			if(inErr==null)
+				continue;
+			ActivationSet outErr = errors.a[b].get(t);
+			if(outErr==null)
+				continue;
+			for(int i=endI-1; i>=startI; --i){
+				float ie = 0;
+				for(int o=outcount-1; o>=0; --o){
+					int w = o + i * outcount;
+					ie += outErr.get(out, poso, o)*params.get(weights, w);
+				}
+				//			if(useResidual){
+				//				ie += outErr.get(out, i);
+				//			}
+				inErr.add(in, posi, i, ie);
+			}
+		}
+	}
+	private void packPropSlice(ParamSet params, ActivationBatch errors, int t, int incount, int outcount, int startA,
+			int endA, int startI, int endI) {
+		for(int b=startA; b<endA; ++b) {
+			if(errors.a[b]==null) continue;
+			ActivationSet inErr = errors.a[b].get(t+dt);
+			if(inErr==null)
+				continue;
+			ActivationSet outErr = errors.a[b].get(t);
+			if(outErr==null)
+				continue;
+			for(int i=endI-1; i>=startI; --i){
+				float ie = 0;
+				for(int o=outcount-1; o>=0; --o){
+					int w = o + i * outcount;
+					ie += outErr.get(out, o)*params.get(weights, w);
+				}
+				//			if(useResidual){
+				//				ie += outErr.get(out, i);
+				//			}
+				inErr.add(in, i, ie);
+			}
+		}
+	}
+
+
+
 	@Override
 	public void gradients(String phase, ParamSet params, ActivationBatch as, 
 			ActivationBatch errors, ParamSet gradients, int t, int[] inst) {
+		int incount;
+		int outcount;
 		if(inst==null) {
-			int incount = in.count;
-			int outcount = out.count;
-			for(int b=0; b<as.length; ++b) {
-				if(errors.a[b]==null) continue;
-				ActivationSet input = as.a[b].get(t+dt);
-				ActivationSet outErr = errors.a[b].get(t);
-				if(input!=null){
-					if(weights.shouldLearn(phase)){
-						for(int i=incount-1, w=weights.count-1; i>=0; --i){
-							for(int o=outcount-1; o>=0; --o, --w){
-								gradients.add(weights, w, outErr.get(out, o) * input.get(in, i));
+			incount = in.count;
+			outcount = out.count;
+		}else {
+			if(inst!=null)
+				Module.add(inst, shift, posi);
+
+			incount = in.channels();
+			outcount = out.channels();
+		}
+		if(par==1) {
+			int startI = 0;
+			int endI = incount;
+			int startO = 0;
+			int endO = outcount;
+			if(inst==null) {
+				gradientsSlice(phase, as, errors, gradients, t, outcount, startI, endI, startO, endO);
+			}else{
+				int[] poso=inst;
+				gradientsSlice(phase, as, errors, gradients, t, outcount, startI, endI, startO, endO, poso);
+			}
+		}else{
+			int taskCount = Math.min(par*4, Math.max(incount, outcount));
+			AtomicInteger done = new AtomicInteger();
+			ArrayList<Future<?>> workers = new ArrayList<>(par);
+			try {
+				for(int i=0; i<par; ++i) {
+					workers.add(parallelizer.submit(()->{
+						while(true) {
+							int task = done.getAndAdd(1);
+							if(task>=taskCount)
+								return;
+							int startI, endI, startO, endO;
+							
+							if(incount>outcount){
+								startI = task * incount / taskCount;
+								endI = (task+1) * incount / taskCount;
+								startO = 0;
+								endO = outcount;
+							}else {
+								startO = task * outcount / taskCount;
+								endO = (task+1) * outcount / taskCount;
+								startI = 0;
+								endI = incount;
+							}
+							
+							if(inst==null) {
+								gradientsSlice(phase, as, errors, gradients, t, outcount, startI, endI, startO, endO);
+							}else{
+								int[] poso=inst;
+								gradientsSlice(phase, as, errors, gradients, t, outcount, startI, endI, startO, endO, poso);
 							}
 						}
-					}
+					}));
 				}
-				if(useBias){
-					if(bias.shouldLearn(phase)){
-						for(int o=outcount-1; o>=0; --o){
-							gradients.add(bias, o, outErr.get(out, o));
-						}
-					}			
-				}
-				for(int i=0; i<coordinateBias.length; ++i) {
-					ParamBlock bias=coordinateBias[i];
-					if(bias!=null) {
-						float activation = coordinateActivations[i];
-						for(int o=outcount-1; o>=0; --o){
-							gradients.add(bias, o, activation*outErr.get(out, o));
+				joinAll(workers);
+
+			}finally {
+				for(Future<?> f: workers)
+					f.cancel(true);
+			}
+		}
+	}
+	private void gradientsSlice(String phase, ActivationBatch as, ActivationBatch errors, ParamSet gradients, int t,
+			int outcount, int startI, int endI, int startO, int endO, int[] poso) {
+		for(int b=0; b<as.length; ++b) {
+			if(errors.a[b]==null) continue;
+			ActivationSet input = as.a[b].get(t+dt);
+			ActivationSet outErr = errors.a[b].get(t);
+			if(input!=null){
+				if(weights.shouldLearn(phase)){
+					for(int i=endI-1; i>=startI; --i){
+						for(int o=endO-1; o>=startO; --o){
+							int w = o + i * outcount;
+							gradients.add(weights, w, outErr.get(out, poso, o) * input.get(in, posi, i));
 						}
 					}
 				}
 			}
-		}else{
-			Module.add(inst, shift, posi);
-			int[] poso=inst;
-			int incount = in.channels();
-			int outcount = out.channels();
-			for(int b=0; b<as.length; ++b) {
-				if(errors.a[b]==null) continue;
-				ActivationSet input = as.a[b].get(t+dt);
-				ActivationSet outErr = errors.a[b].get(t);
-				if(input!=null){
-					if(weights.shouldLearn(phase)){
-						for(int i=incount-1, w=weights.count-1; i>=0; --i){
-							for(int o=outcount-1; o>=0; --o, --w){
-								gradients.add(weights, w, outErr.get(out, poso, o) * input.get(in, posi, i));
-							}
-						}
-					}
-				}
+			if(startI==0) {
+
 				if(useBias){
 					if(bias.shouldLearn(phase)){
-						for(int o=outcount-1; o>=0; --o){
+						for(int o=endO-1; o>=startO; --o){
 							gradients.add(bias, o, outErr.get(out, poso, o));
 						}
 					}			
@@ -335,8 +493,44 @@ public class Dense implements InOutBiasModule{
 					ParamBlock bias=coordinateBias[i];
 					if(bias!=null) {
 						float activation = coordinateActivations[i];
-						for(int o=outcount-1; o>=0; --o){
+						for(int o=endO-1; o>=startO; --o){
 							gradients.add(bias, o, activation*outErr.get(out, poso, o));
+						}
+					}
+				}
+			}
+		}
+	}
+	private void gradientsSlice(String phase, ActivationBatch as, ActivationBatch errors, ParamSet gradients, int t,
+			int outcount, int startI, int endI, int startO, int endO) {
+		for(int b=0; b<as.length; ++b) {
+			if(errors.a[b]==null) continue;
+			ActivationSet input = as.a[b].get(t+dt);
+			ActivationSet outErr = errors.a[b].get(t);
+			if(input!=null){
+				if(weights.shouldLearn(phase)){
+					for(int i=endI-1; i>=startI; --i){
+						for(int o=endO-1; o>=startO; --o){
+							int w = o + i * outcount;
+							gradients.add(weights, w, outErr.get(out, o) * input.get(in, i));
+						}
+					}
+				}
+			}
+			if(startI==0) {
+				if(useBias){
+					if(bias.shouldLearn(phase)){
+						for(int o=endO-1; o>=startO; --o){
+							gradients.add(bias, o, outErr.get(out, o));
+						}
+					}			
+				}
+				for(int i=0; i<coordinateBias.length; ++i) {
+					ParamBlock bias=coordinateBias[i];
+					if(bias!=null) {
+						float activation = coordinateActivations[i];
+						for(int o=endO-1; o>=startO; --o){
+							gradients.add(bias, o, activation*outErr.get(out, o));
 						}
 					}
 				}
@@ -349,11 +543,11 @@ public class Dense implements InOutBiasModule{
 			reg.regularize(params, gradients, weights.start, out.count, 1, in.count, out.count, globReg);
 		}
 	}
-//	//	@Override
-//	public void declareDependencies(Dependencies d) {
-//		d.declare(new InputDependency(in, this, dt));
-//		d.declare(new OutputDependency(this, out));
-//	}
+	//	//	@Override
+	//	public void declareDependencies(Dependencies d) {
+	//		d.declare(new InputDependency(in, this, dt));
+	//		d.declare(new OutputDependency(this, out));
+	//	}
 
 	@Override
 	public void dontComputeInPhase(String phase) {		
@@ -421,6 +615,12 @@ public class Dense implements InOutBiasModule{
 	public Dense shift(int[] shift){
 		this.shift=shift==null?null:shift.clone();
 		posi=shift==null?null:new int[shift.length];
+		return this;
+	}
+	public Dense parallel(int threads) {
+		if(threads<1)
+			throw new IllegalArgumentException();
+		par = threads;
 		return this;
 	}
 } 
