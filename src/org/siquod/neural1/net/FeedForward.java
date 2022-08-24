@@ -48,7 +48,7 @@ public class FeedForward {
 			a.get(out, output);
 			lossLayer.forward(ForwardPhase.TRAINING, ps, ass, 0, null);
 			double lossVal =a.get(loss, 0);
-//			System.out.println(lossVal);
+			//			System.out.println(lossVal);
 			return lossVal;
 		}
 		public String showWeights() {
@@ -58,7 +58,8 @@ public class FeedForward {
 					r.append(((Dense) n).showParams(ps));
 			return r.toString();
 		}
-		public double computeLoss(TrainingBatchCursor data) {
+
+		public double computeLoss(TrainingBatchCursor data, int bs) {
 			double[] inBuffer = new double[data.inputCount()];
 			double[] outBuffer = new double[data.outputCount()];
 			float[] inBufferFloat = new float[inBuffer.length];
@@ -66,73 +67,108 @@ public class FeedForward {
 			data.reset();
 			double lossSum=0;
 			int n=0;
-			while(!data.isFinished()) {
-				data.giveInputs(inBuffer);
-				data.giveOutputs(outBuffer);
-				for(int j=0; j<inBuffer.length; ++j)
-					inBufferFloat[j]=(float)inBuffer[j];
-				for(int j=0; j<outBuffer.length; ++j)
-					outBufferFloat[j]=(float)outBuffer[j];
+			ActivationBatch ass = new ActivationBatch(bs, 1, ia, ba);
+			int bi = 0;
+			net.initializeRun(ass, false);
 
-				a.clear();
-				net.initializeRun(ass, false);
-				a.set(in, inBufferFloat);
-				a.set(target, outBufferFloat);
-				
-				net.forward(ForwardPhase.TESTING, ps, ass, 0, null);
-				lossLayer.forward(ForwardPhase.TESTING, ps, ass, 0, null);
-				double lossVal =a.get(loss, 0);
-//				System.out.println(lossVal);
-				
-				lossSum+=lossVal;
-				n++;
-				data.next();
+			while(!data.isFinished()) {
+				{
+					data.giveInputs(inBuffer);
+					data.giveOutputs(outBuffer);
+					for(int j=0; j<inBuffer.length; ++j)
+						inBufferFloat[j]=(float)inBuffer[j];
+					for(int j=0; j<outBuffer.length; ++j)
+						outBufferFloat[j]=(float)outBuffer[j];
+					ActivationSeq as=ass.a[bi];
+					ActivationSet a=as.get(0);
+					a.clear();
+					a.set(in, inBufferFloat);
+					a.set(target, outBufferFloat);
+					data.next();
+					++bi;
+				}
+				if(bi>=bs || data.isFinished()) {
+					ass.length=bi;
+					net.forward(ForwardPhase.TESTING, ps, ass, 0, null);
+					lossLayer.forward(ForwardPhase.TESTING, ps, ass, 0, null);
+					//					System.out.println(lossVal);
+					for(bi=0; bi<ass.length; ++bi) {
+						ActivationSeq as=ass.a[bi];
+						ActivationSet a=as.get(0);
+						double lossVal =a.get(loss, 0);
+						lossSum+=lossVal;
+					}
+					n+=bi;
+					bi=0;
+				}
+
+
+
 
 			}
 			return lossSum/n;
 		}
-		public int[][] computeConfusion(TrainingBatchCursor data) {
+		public int[][] computeConfusion(TrainingBatchCursor data, int bs) {
 			int[][] ret = new int[data.outputCount()][data.outputCount()];
 			double[] inBuffer = new double[data.inputCount()];
 			double[] outBuffer = new double[data.outputCount()];
+			int[] correctOutputs = new int[bs];
 			float[] inBufferFloat = new float[inBuffer.length];
 			float[] outBufferFloat = new float[outBuffer.length];
 			data.reset();
-			while(!data.isFinished()) {
-				data.giveInputs(inBuffer);
-				data.giveOutputs(outBuffer);
-				int correctOutput = 0;
-				{
-					double best = Double.NEGATIVE_INFINITY;
-					for(int i=0; i<outBuffer.length; ++i) {
-						double v = outBuffer[i];
-						if(v>best) {
-							correctOutput = i;
-							best = v;
-						}
-					}
-				}
-				for(int j=0; j<inBuffer.length; ++j)
-					inBufferFloat[j]=(float)inBuffer[j];
-				for(int j=0; j<outBuffer.length; ++j)
-					outBufferFloat[j]=(float)outBuffer[j];
-				
-				eval(inBufferFloat, outBufferFloat);
-				
-				int givenOutput = 0;
-				{
-					double best = Double.NEGATIVE_INFINITY;
-					for(int i=0; i<outBufferFloat.length; ++i) {
-						double v = outBufferFloat[i];
-						if(v>best) {
-							givenOutput = i;
-							best = v;
-						}
-					}
-				}
-				++ret[correctOutput][givenOutput];
-				data.next();
+			ActivationBatch ass = new ActivationBatch(bs, 1, ia, ba);
+			int bi = 0;
+			net.initializeRun(ass, false);
 
+			while(!data.isFinished()) {
+				{
+					data.giveInputs(inBuffer);
+					data.giveOutputs(outBuffer);
+					int correctOutput = 0;
+					{
+						double best = Double.NEGATIVE_INFINITY;
+						for(int i=0; i<outBuffer.length; ++i) {
+							double v = outBuffer[i];
+							if(v>best) {
+								correctOutput = i;
+								best = v;
+							}
+						}
+					}
+					correctOutputs[bi]=correctOutput;
+					for(int j=0; j<inBuffer.length; ++j)
+						inBufferFloat[j]=(float)inBuffer[j];
+					ActivationSeq as=ass.a[bi];
+					ActivationSet a=as.get(0);
+
+					a.clear();
+					a.set(in, inBufferFloat);
+					data.next();
+					++bi;
+				}
+				if(bi>=bs || data.isFinished()) {
+					ass.length = bi;
+					net.forward(ForwardPhase.TESTING, ps, ass, 0, null);
+					for(bi=0; bi<ass.length; ++bi) {
+						ActivationSeq as=ass.a[bi];
+						ActivationSet a=as.get(0);
+						a.get(out, outBufferFloat);
+						int correctOutput = correctOutputs[bi];
+						int givenOutput = 0;
+						{
+							double best = Double.NEGATIVE_INFINITY;
+							for(int i=0; i<outBufferFloat.length; ++i) {
+								double v = outBufferFloat[i];
+								if(v>best) {
+									givenOutput = i;
+									best = v;
+								}
+							}
+						}
+						++ret[correctOutput][givenOutput];
+					}
+					bi=0;
+				}
 			}
 			return ret;
 		}
@@ -158,10 +194,10 @@ public class FeedForward {
 			}
 			sb.append('\n');
 		}
-		
+
 		return sb.toString();
 	}
-	
+
 
 	public class NaiveTrainer implements Cloneable{
 		ParamSet ps=new ParamSet(paramCount);
@@ -210,7 +246,7 @@ public class FeedForward {
 			double[] outBuffer = new double[data.inputCount()];
 			float[] inBufferFloat = new float[inBuffer.length];
 			float[] outBufferFloat = new float[outBuffer.length];
-//			System.out.println("Training for one epoch!");
+			//			System.out.println("Training for one epoch!");
 			boolean last=false;
 			@SuppressWarnings("unused")
 			int count=0;
@@ -233,8 +269,8 @@ public class FeedForward {
 					imp[currentBatchSize]=(float) data.getWeight();
 					data.next();
 				}
-//				System.out.println("Consume next batch: "+currentBatchSize+" samples");
-//				System.out.println("processed samples: "+count);
+				//				System.out.println("Consume next batch: "+currentBatchSize+" samples");
+				//				System.out.println("processed samples: "+count);
 
 				endBatch();
 			}
@@ -262,7 +298,7 @@ public class FeedForward {
 			//			if(currentBatchSize!=imp.length)
 			//				throw new IllegalStateException("The batch is not yet full");
 
-
+			ass.length = ess.length = currentBatchSize;
 
 
 			net.initializeRun(ass, true);

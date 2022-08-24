@@ -1,6 +1,8 @@
 package org.siquod.neural1;
 
-public class ActivationBatch implements Cloneable{
+import java.util.Iterator;
+
+public class ActivationBatch implements Cloneable, Iterable<ActivationSeq>{
 	public ActivationSeq[] a;
 	public ActivationSeq batchParams;
 	public int length;
@@ -37,6 +39,19 @@ public class ActivationBatch implements Cloneable{
 			e.printStackTrace();
 			return null;
 		}
+	}
+	public Iterator<ActivationSeq> iterator(){
+		return new Iterator<ActivationSeq>() {
+			int at = 0;
+			@Override
+			public ActivationSeq next() {
+				return a[at++];
+			}
+			@Override
+			public boolean hasNext() {
+				return at<length;
+			}
+		};
 	}
 }
  
