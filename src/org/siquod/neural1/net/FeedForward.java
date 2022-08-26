@@ -14,6 +14,7 @@ import org.siquod.neural1.ParamAllocator;
 import org.siquod.neural1.ParamSet;
 import org.siquod.neural1.TensorFormat;
 import org.siquod.neural1.data.TrainingBatchCursor;
+import org.siquod.neural1.data.Whitener;
 import org.siquod.neural1.modules.Dense;
 import org.siquod.neural1.modules.InOutModule;
 import org.siquod.neural1.modules.loss.LossLayer;
@@ -32,24 +33,32 @@ public class FeedForward {
 		ActivationBatch ass= new ActivationBatch(1, 1, ia, ba);
 		ActivationSeq as=ass.a[0];
 		ActivationSet a=as.get(0);
+		float[] whitenedInputs = new float[in.count];
+		private Whitener inputWhitener;
 		public Eval(ParamSet ps){
 			this.ps=ps;
 			if(ps.size()!=paramCount)
 				throw new IllegalArgumentException("Param set has wrong size");
+
 		}
 		public double eval(float[] input, float[] output){
 			a.clear();
 			//			as.clearLifeInterfaces(true);
 
 			net.initializeRun(ass, false);
-
-			a.set(in, input);
+			a.set(in, applyWhitener(input));
 			net.forward(ForwardPhase.TESTING, ps, ass, 0, null);
 			a.get(out, output);
 			lossLayer.forward(ForwardPhase.TRAINING, ps, ass, 0, null);
 			double lossVal =a.get(loss, 0);
 			//			System.out.println(lossVal);
 			return lossVal;
+		}
+		private float[] applyWhitener(float[] input) {
+			if(inputWhitener==null)
+				return input;
+			inputWhitener.whiten(input, whitenedInputs);
+			return whitenedInputs;
 		}
 		public String showWeights() {
 			StringBuilder r=new StringBuilder(); 
@@ -82,7 +91,7 @@ public class FeedForward {
 					ActivationSeq as=ass.a[bi];
 					ActivationSet a=as.get(0);
 					a.clear();
-					a.set(in, inBufferFloat);
+					a.set(in, applyWhitener(inBufferFloat));
 					a.set(target, outBufferFloat);
 					data.next();
 					++bi;
@@ -142,7 +151,7 @@ public class FeedForward {
 					ActivationSet a=as.get(0);
 
 					a.clear();
-					a.set(in, inBufferFloat);
+					a.set(in, applyWhitener(inBufferFloat));
 					data.next();
 					++bi;
 				}
@@ -171,6 +180,10 @@ public class FeedForward {
 				}
 			}
 			return ret;
+		}
+		public Eval inputWhitener(Whitener whitener) {
+			inputWhitener = whitener;
+			return this;
 		}
 	}
 	public static String confusionMatrixToString(int[][] mat) {
@@ -253,6 +266,10 @@ public class FeedForward {
 			while(!last) {
 				for(currentBatchSize=0; currentBatchSize<batchSize; ++currentBatchSize, ++count) {
 					if(data.isFinished()) {
+//						if(true) {
+//							currentBatchSize=0;
+//							return;
+//						}
 						data.reset();
 						last=true;
 					}
@@ -273,6 +290,9 @@ public class FeedForward {
 				//				System.out.println("processed samples: "+count);
 
 				endBatch();
+				if(data.isFinished())
+					break;
+						
 			}
 		}
 

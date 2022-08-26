@@ -114,18 +114,18 @@ public class LogSoftmax implements InOutModule{
 				float sum = 0;
 				double max=Double.NEGATIVE_INFINITY;
 				int maxi=-1;
-				for(int i=0; i<in.count; ++i){
+				for(int i=0; i<n1; ++i){
 					double av = a.get(in, tf.index(i0, i));
 					if(av>max){
 						max=av;
 						maxi=i;
 					}
 				}
-				for(int i=0; i<in.count; ++i){
+				for(int i=0; i<n1; ++i){
 					odSum+=e.get(out, i);
 					sum += Math.exp(a.get(in, tf.index(i0, i)) - max);		
 				}
-				for(int i=0; i<in.count; i++){
+				for(int i=0; i<n1; i++){
 					if(false && i==maxi){
 						e.add(in, i, e.get(out, tf.index(i0, i)) - odSum );
 					}else{

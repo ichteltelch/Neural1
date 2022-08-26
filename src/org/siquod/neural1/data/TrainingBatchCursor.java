@@ -206,6 +206,37 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 			}
 			
 		}
+		public default RandomAccess fillToModulus(int modulus, boolean roundUpNotDown) {
+			long size = this.size();
+			
+			int repeats;
+			if(size>=modulus) {
+				repeats = (size%modulus==0)?1:2;
+			}else {
+				long count = size/modulus;
+
+				if(!roundUpNotDown || size%modulus==0)
+					repeats = (int)count;
+				else
+					repeats = (int) (count + 1);
+			}
+			RandomAccess repeated;
+			if(repeats>1) {
+				RandomAccess[] rs = new RandomAccess[repeats];
+				Arrays.fill(rs, this);
+				repeated = concat(rs);
+			}else {
+				repeated = this;
+			}
+			RandomAccess truncated;
+			long over = repeated.size() % modulus;
+			if(over==0) {
+				truncated = repeated;
+			}else {
+				truncated = repeated.subsequence(0, repeated.size() - over);
+			}
+			return truncated;
+		}
 	}
 	
 	
@@ -571,6 +602,7 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 		ArrayList<Double> weights=new ArrayList<>();
 		int ic = of.inputCount();
 		int oc = of.outputCount();
+		of.reset();
 		while(!of.isFinished()) {
 			double[] i = new double[ic];
 			double[] o = new double[oc];
@@ -589,6 +621,7 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 
 		return new RamBuffer(is, os, ws, 0, ic, oc);
 	}
+
 	public static class RamBuffer implements RandomAccess{
 		RamBuffer(double[][] is2, double[][] os2, double[] ws2, int at2, int ic, int oc) {
 			is=is2;

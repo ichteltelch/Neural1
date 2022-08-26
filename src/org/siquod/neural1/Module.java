@@ -2,9 +2,15 @@ package org.siquod.neural1;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Function;
 
 public interface Module {
+	public static final ExecutorService parallelizer = Executors.newCachedThreadPool(); 
+
 	public static int[] EIA= {};
 	void allocate(InterfaceAllocator ia);
 	void allocate(ParamAllocator ia);
@@ -66,5 +72,16 @@ public interface Module {
 	public default void defaultInitParams(ParamSet p) {
 		for(Module m: getSubmodules())
 			m.initParams(p);
+	}
+	public static void joinAll(ArrayList<Future<?>> workers) {
+		try {
+			for(Future<?> f: workers) 
+				f.get();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} catch (ExecutionException e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
 	}
 }

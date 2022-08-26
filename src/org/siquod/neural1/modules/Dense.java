@@ -4,9 +4,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -24,7 +21,7 @@ import org.siquod.neural1.ParamSet;
 import org.siquod.neural1.modules.regularizer.Regularizer;
 
 /**
- * This module performs a linear mapping from its input vecotr to its output vector
+ * This module performs a linear mapping from its input vector to its output vector
  * @author bb
  *
  */
@@ -133,7 +130,6 @@ public class Dense implements InOutBiasModule{
 		return ret;
 	}
 
-	public static final ExecutorService parallelizer = Executors.newCachedThreadPool(); 
 	@Override
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst) {
 		int incount;
@@ -186,7 +182,7 @@ public class Dense implements InOutBiasModule{
 						}
 					}));
 				}
-				joinAll(workers);
+				Module.joinAll(workers);
 
 			}finally {
 				for(Future<?> f: workers)
@@ -194,17 +190,7 @@ public class Dense implements InOutBiasModule{
 			}
 		}
 	}
-	private void joinAll(ArrayList<Future<?>> workers) {
-		try {
-			for(Future<?> f: workers) 
-				f.get();
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		} catch (ExecutionException e) {
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
-	}
+
 	private void forwardSlice(ParamSet params, ActivationBatch as, int t, int incount, int outcount, int startA,
 			int endA, int startO, int endO) {
 		for(int ai = startA; ai<endA; ++ai) {
@@ -339,7 +325,7 @@ public class Dense implements InOutBiasModule{
 						}
 					}));
 				}
-				joinAll(workers);
+				Module.joinAll(workers);
 
 			}finally {
 				for(Future<?> f: workers)
@@ -456,7 +442,7 @@ public class Dense implements InOutBiasModule{
 						}
 					}));
 				}
-				joinAll(workers);
+				Module.joinAll(workers);
 
 			}finally {
 				for(Future<?> f: workers)
