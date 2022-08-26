@@ -1,7 +1,10 @@
 package org.siquod.neural1.modules;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import org.siquod.neural1.ActivationBatch;
@@ -25,6 +28,7 @@ public class BatchReNorm implements InOutScaleBiasModule{
 	ParamBlock add, mult, runningMean, runningSdev;
 	int age=0;
 	boolean hasAdd=true;
+	int par=1;
 
 	Function<Integer, Float> rmaxSchedule=rmaxSchedule(100);
 	Function<Integer, Float> dmaxSchedule=dmaxSchedule(100);
@@ -89,77 +93,97 @@ public class BatchReNorm implements InOutScaleBiasModule{
 		ActivationSet bparm = as.batchParams.get(t);
 		if(inst==null) {
 			if(training != ForwardPhase.TESTING) {
+
 				float dmax=dmaxSchedule.apply(age);
 				float rmax=rmaxSchedule.apply(age);
-				for(int i=0; i<in.count; ++i) {
-					float mean=0;
-					int count=0;
-					for(ActivationSeq b: as) {
-						if(b==null)
-							continue;
-						mean+=b.get(t).get(in, i);
-						count++;
-					}
-					mean/=count;
-					float var = 0;
-					for(ActivationSeq b: as) {
-						if(b==null)
-							continue;
-						float d = b.get(t).get(in, i) - mean;
-						var += d*d;
-					}
-					var/=count;
-					float sdev=(float) Math.sqrt(var+epsilon);
-					float scal = 1/sdev;
-					float rmean=params.get(runningMean, i);
-					float rsdev=params.get(runningSdev, i);
+				
+				int taskCount = Math.min(par*4, in.count);
+				if(par==1 || taskCount==1) {
+					int startI = 0;
+					int endI = in.count;
+					forwardSlice(params, as, t, bparm, startI, endI, dmax, rmax);
+				}else {
+					AtomicInteger done = new AtomicInteger();
+					int neededWorkers = Math.min(par, taskCount);
+					ArrayList<Future<?>> workers = new ArrayList<>(neededWorkers);
+					try {
+						for(int i=0; i<neededWorkers; ++i) {
+							workers.add(parallelizer.submit(()->{
+								while(true) {
+									int task = done.getAndAdd(1);
+									if(task>=taskCount)
+										return;
+									int startI = task * in.count / taskCount;
+									int endI = (task+1) * in.count / taskCount;
+									forwardSlice(params, as, t, bparm, startI, endI, dmax, rmax);
+								}
+							}));
+						}
+						Module.joinAll(workers);
 
-					float r=Math.min(rmax, Math.max(1/rmax, sdev/rsdev));
-					float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
-					{
-						bparm.set(this.mean, i, mean);
-						bparm.set(this.sdev, i, sdev);
+					}finally {
+						for(Future<?> f: workers)
+							f.cancel(true);
 					}
 
-					float addVal=hasAdd?params.get(add, i):0;
-					float multVal=params.get(mult, i);
-//					if(i==0) {
-//						System.out.println("mean = "+mean+", var = "+var);
-//						System.out.println("add = "+addVal+", mult = "+multVal);
-//					}
-					//					System.out.println(" (x - "+mean+") * "+scal+" * "+multVal+" + "+addVal);
-					for(ActivationSeq b: as) {
-						if(b==null)
-							continue;
-						ActivationSet a = b.get(t);
-						float dv = (a.get(in, i) - mean)*scal*r+d;
-						float v = dv*multVal + addVal;
-						a.add(out, i, v);
-					}
 				}
 			}else {
-				for(ActivationSeq b: as) {
-					if(b==null)
-						continue;
-					for(int i=0; i<in.count; ++i) {
-						ActivationSet a = b.get(t);
-						float mean = params.get(this.runningMean, i);
-						float sdev = params.get(this.runningSdev, i);
-						float addVal=hasAdd?params.get(add, i):0;
-						float multVal=params.get(mult, i);
-//						if(i==0) {
-//							System.out.println("mean = "+mean+", var = "+var);
-//							System.out.println("add = "+addVal+", mult = "+multVal);
-//						}
-						//						System.out.println(" (x + "+mShift+") * "+vScale+" * "+multVal+" + "+addVal);
+				int maxPar = Math.max(in.count, as.length);
+				
+				int taskCount = Math.min(par*4, maxPar);
+				if(par==1 || taskCount==1) {
+					int startI = 0;
+					int endI = in.count;
+					int startA = 0;
+					int endA = as.length;
 
-						float scal = 1/sdev;
+					forwardInferenceSlice(params, as, t, startI, endI, startA, endA);
+				}else{
+					AtomicInteger done = new AtomicInteger();
+					int workersNeeded = Math.min(par, maxPar);
+					ArrayList<Future<?>> workers = new ArrayList<>(workersNeeded);
+					try {
+						if(maxPar==as.length) {
+							for(int i=0; i<workersNeeded; ++i) {
+								workers.add(parallelizer.submit(()->{
+									while(true) {
+										int task = done.getAndAdd(1);
+										if(task>=taskCount)
+											return;
+										int startA = task * as.length / taskCount;
+										int endA = (task+1) * as.length / taskCount;
+										int startI = 0;
+										int endI = in.count;
+										forwardInferenceSlice(params, as, t, startI, endI, startA, endA);
+									}
+								}));
+							}
+						}else {
+							for(int i=0; i<workersNeeded; ++i) {
+								workers.add(parallelizer.submit(()->{
+									while(true) {
+										int task = done.getAndAdd(1);
+										if(task>=taskCount)
+											return;
+										int startI = task * in.count / taskCount;
+										int endI = (task+1) * in.count / taskCount;
+										int startA = 0;
+										int endA = as.length;
+										forwardInferenceSlice(params, as, t, startI, endI, startA, endA);
+									}
+								}));
+							}
+						}
+						Module.joinAll(workers);
 
-						float d = (a.get(in, i) - mean)*scal;
-						float v = d*multVal + addVal;
-						a.add(out, i, v);
+					}finally {
+						for(Future<?> f: workers)
+							f.cancel(true);
 					}
+
 				}
+
+				
 			}
 		}else {
 			//TODO
@@ -167,76 +191,187 @@ public class BatchReNorm implements InOutScaleBiasModule{
 		}
 
 	}
+	private void forwardInferenceSlice(ParamSet params, ActivationBatch as, int t, int startI, int endI, int startA,
+			int endA) {
+		for(int bi = startA; bi<endA; ++bi) {
+			ActivationSeq b = as.a[bi];
+			if(b==null)
+				continue;
+			for(int i=startI; i<endI; ++i) {
+				ActivationSet a = b.get(t);
+				float mean = params.get(this.runningMean, i);
+				float sdev = params.get(this.runningSdev, i);
+				float addVal=hasAdd?params.get(add, i):0;
+				float multVal=params.get(mult, i);
+//						if(i==0) {
+//							System.out.println("mean = "+mean+", var = "+var);
+//							System.out.println("add = "+addVal+", mult = "+multVal);
+//						}
+				//						System.out.println(" (x + "+mShift+") * "+vScale+" * "+multVal+" + "+addVal);
+
+				float scal = 1/sdev;
+
+				float d = (a.get(in, i) - mean)*scal;
+				float v = d*multVal + addVal;
+				a.add(out, i, v);
+			}
+		}
+	}
+	private void forwardSlice(ParamSet params, ActivationBatch as, int t, ActivationSet bparm, int startI, int endI,
+			float dmax, float rmax) {
+		for(int i=startI; i<endI; ++i) {
+			float mean=0;
+			int count=0;
+			for(ActivationSeq b: as) {
+				if(b==null)
+					continue;
+				mean+=b.get(t).get(in, i);
+				count++;
+			}
+			mean/=count;
+			float var = 0;
+			for(ActivationSeq b: as) {
+				if(b==null)
+					continue;
+				float d = b.get(t).get(in, i) - mean;
+				var += d*d;
+			}
+			var/=count;
+			float sdev=(float) Math.sqrt(var+epsilon);
+			float scal = 1/sdev;
+			float rmean=params.get(runningMean, i);
+			float rsdev=params.get(runningSdev, i);
+
+			float r=Math.min(rmax, Math.max(1/rmax, sdev/rsdev));
+			float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
+			{
+				bparm.set(this.mean, i, mean);
+				bparm.set(this.sdev, i, sdev);
+			}
+
+			float addVal=hasAdd?params.get(add, i):0;
+			float multVal=params.get(mult, i);
+//					if(i==0) {
+//						System.out.println("mean = "+mean+", var = "+var);
+//						System.out.println("add = "+addVal+", mult = "+multVal);
+//					}
+			//					System.out.println(" (x - "+mean+") * "+scal+" * "+multVal+" + "+addVal);
+			for(ActivationSeq b: as) {
+				if(b==null)
+					continue;
+				ActivationSet a = b.get(t);
+				float dv = (a.get(in, i) - mean)*scal*r+d;
+				float v = dv*multVal + addVal;
+				a.add(out, i, v);
+			}
+		}
+	}
 
 	@Override
 	public void backprop(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, int t, int[] inst) {
 //		float dmax=dmaxSchedule.apply(age);
 		float rmax=rmaxSchedule.apply(age);
+		
 		if(inst==null) {
-			for(int i=0; i<in.count; ++i) {
+			
+			int taskCount = Math.min(par*4, in.count);
+			if(par==1 || taskCount==1) {
+				int startI = 0;
+				int endI = in.count;
+				backpropSlice(params, as, errors, t, rmax, startI, endI);
+			}else {
+				AtomicInteger done = new AtomicInteger();
+				int workersNeeded = Math.min(par, taskCount);
+				ArrayList<Future<?>> workers = new ArrayList<>(workersNeeded);
+				try {
+					for(int i=0; i<workersNeeded; ++i) {
+						workers.add(parallelizer.submit(()->{
+							while(true) {
+								int task = done.getAndAdd(1);
+								if(task>=taskCount)
+									return;
+								int startI = task * in.count / taskCount;
+								int endI = (task+1) * in.count / taskCount;
+								backpropSlice(params, as, errors, t, rmax, startI, endI);
+							}
+						}));
+					}
+					Module.joinAll(workers);
 
-				float mean = as.batchParams.get(t).get(this.mean, i);
-				float sdev = as.batchParams.get(t).get(this.sdev, i);
-				float scal = 1/sdev;
-//				float rmean=params.get(runningMean, i);
-				float rsdev=params.get(runningSdev, i);
-
-				float r=Math.min(rmax, Math.max(1/rmax, sdev/rsdev));
-//				float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
-
-				//				float addVal=params.get(add, i);
-				float multVal=params.get(mult, i);
-				int count=0;
-				float scalErr=0;
-
-				for(int b=0; b<as.length; ++b) {
-					ActivationSeq es=errors.a[b];
-					if(es==null)
-						continue;
-					count++;
-					ActivationSet a = as.a[b].get(t);
-					ActivationSet e = es.get(t);
-					float me=e.get(out, i)*multVal;
-					float scalInp = (a.get(in, i)-mean);
-					scalErr+=me*scalInp;
-
-
+				}finally {
+					for(Future<?> f: workers)
+						f.cancel(true);
 				}
-				//			float scal = 1/Math.sqrt(var+epsilon);
-				//			ð var = -0.5*(var+epsilon)^1.5 * ð scal;
-				float varErr = scalErr * -0.5f / (sdev*sdev*sdev);
-				varErr/=count;
-				float meanErr=0;
-				for(int b=0; b<as.length; ++b) {
-					ActivationSeq es=errors.a[b];
-					if(es==null)
-						continue;
-					ActivationSet a = as.a[b].get(t);
-					ActivationSet e = es.get(t);
-					float scalInp = a.get(in, i)-mean;
-					float me=e.get(out, i)*multVal*r;
-					me *= scal;
-					me += 2 * scalInp * varErr;
-					meanErr += -me;
-				}
-				meanErr/=count;
-				for(int b=0; b<as.length; ++b) {
-					ActivationSeq es=errors.a[b];
-					if(es==null)
-						continue;
-					ActivationSet a = as.a[b].get(t);
-					ActivationSet e = es.get(t);
-					float scalInp = a.get(in, i)-mean;
-					float me=e.get(out, i)*multVal*r;
-					me *= scal;
-					me += 2 * scalInp * varErr;
-					me += meanErr;
-					e.add(in, i, me);
-				}
+
 			}
+
 		}else {
 			//TODO
 			throw new UnsupportedOperationException("Not implemented");
+		}
+	}
+	private void backpropSlice(ParamSet params, ActivationBatch as, ActivationBatch errors, int t, float rmax,
+			int startI, int endI) {
+		for(int i=startI; i<endI; ++i) {
+
+			float mean = as.batchParams.get(t).get(this.mean, i);
+			float sdev = as.batchParams.get(t).get(this.sdev, i);
+			float scal = 1/sdev;
+//				float rmean=params.get(runningMean, i);
+			float rsdev=params.get(runningSdev, i);
+
+			float r=Math.min(rmax, Math.max(1/rmax, sdev/rsdev));
+//				float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
+
+			//				float addVal=params.get(add, i);
+			float multVal=params.get(mult, i);
+			int count=0;
+			float scalErr=0;
+
+			for(int b=0; b<as.length; ++b) {
+				ActivationSeq es=errors.a[b];
+				if(es==null)
+					continue;
+				count++;
+				ActivationSet a = as.a[b].get(t);
+				ActivationSet e = es.get(t);
+				float me=e.get(out, i)*multVal;
+				float scalInp = (a.get(in, i)-mean);
+				scalErr+=me*scalInp;
+
+
+			}
+			//			float scal = 1/Math.sqrt(var+epsilon);
+			//			ð var = -0.5*(var+epsilon)^1.5 * ð scal;
+			float varErr = scalErr * -0.5f / (sdev*sdev*sdev);
+			varErr/=count;
+			float meanErr=0;
+			for(int b=0; b<as.length; ++b) {
+				ActivationSeq es=errors.a[b];
+				if(es==null)
+					continue;
+				ActivationSet a = as.a[b].get(t);
+				ActivationSet e = es.get(t);
+				float scalInp = a.get(in, i)-mean;
+				float me=e.get(out, i)*multVal*r;
+				me *= scal;
+				me += 2 * scalInp * varErr;
+				meanErr += -me;
+			}
+			meanErr/=count;
+			for(int b=0; b<as.length; ++b) {
+				ActivationSeq es=errors.a[b];
+				if(es==null)
+					continue;
+				ActivationSet a = as.a[b].get(t);
+				ActivationSet e = es.get(t);
+				float scalInp = a.get(in, i)-mean;
+				float me=e.get(out, i)*multVal*r;
+				me *= scal;
+				me += 2 * scalInp * varErr;
+				me += meanErr;
+				e.add(in, i, me);
+			}
 		}
 	}
 
@@ -246,45 +381,78 @@ public class BatchReNorm implements InOutScaleBiasModule{
 		float dmax=dmaxSchedule.apply(age);
 		float rmax=rmaxSchedule.apply(age);
 		if(inst==null) {
-			for(int i=0; i<in.count; ++i) {
+			int taskCount = Math.min(par*4, in.count);
+			if(par==1 || taskCount==1) {
+				int startI = 0;
+				int endI = in.count;
+				gradientSlice(params, as, errors, gradients, t, dmax, rmax, startI, endI);
+			}else {
+				AtomicInteger done = new AtomicInteger();
+				int workersNeeded = Math.min(par, taskCount);
+				ArrayList<Future<?>> workers = new ArrayList<>(workersNeeded);
+				try {
+					for(int i=0; i<workersNeeded; ++i) {
+						workers.add(parallelizer.submit(()->{
+							while(true) {
+								int task = done.getAndAdd(1);
+								if(task>=taskCount)
+									return;
+								int startI = task * in.count / taskCount;
+								int endI = (task+1) * in.count / taskCount;
+								gradientSlice(params, as, errors, gradients, t, dmax, rmax, startI, endI);
+							}
+						}));
+					}
+					Module.joinAll(workers);
 
-				float mean = as.batchParams.get(t).get(this.mean, i);
-				float sdev = as.batchParams.get(t).get(this.sdev, i);
-				float scal = 1/sdev;
-				float rmean=params.get(runningMean, i);
-				float rsdev=params.get(runningSdev, i);
-
-				float r=Math.min(rmax, Math.max(1/rmax, sdev/rsdev));
-				float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
-
-				//				int count=0;
-
-				float addErr=0;
-				float multErr=0;
-				for(int b=0; b<as.length; ++b) {
-					ActivationSeq es=errors.a[b];
-					if(es==null)
-						continue;
-					//					count++;
-					ActivationSet a = as.a[b].get(t);
-					ActivationSet e = es.get(t);
-					float oe=e.get(out, i);
-					addErr += oe;
-					float reparin = (a.get(in, i)-mean)*scal*r+d;
-					multErr += reparin * oe;
-
-
+				}finally {
+					for(Future<?> f: workers)
+						f.cancel(true);
 				}
-				if(hasAdd)
-					gradients.add(add, i, addErr);
-				gradients.add(mult, i, multErr);
-//				gradients.set(runningMean, i, 0);
-//				gradients.add(runningVar, i, 0);
+
 			}
+
 		}else {
 			//TODO
 			throw new UnsupportedOperationException("Not implemented");
 		}	
+	}
+	private void gradientSlice(ParamSet params, ActivationBatch as, ActivationBatch errors, ParamSet gradients, int t,
+			float dmax, float rmax, int startI, int endI) {
+		for(int i=startI; i<endI; ++i) {
+			float mean = as.batchParams.get(t).get(this.mean, i);
+			float sdev = as.batchParams.get(t).get(this.sdev, i);
+			float scal = 1/sdev;
+			float rmean=params.get(runningMean, i);
+			float rsdev=params.get(runningSdev, i);
+
+			float r=Math.min(rmax, Math.max(1/rmax, sdev/rsdev));
+			float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
+
+			//				int count=0;
+
+			float addErr=0;
+			float multErr=0;
+			for(int b=0; b<as.length; ++b) {
+				ActivationSeq es=errors.a[b];
+				if(es==null)
+					continue;
+				//					count++;
+				ActivationSet a = as.a[b].get(t);
+				ActivationSet e = es.get(t);
+				float oe=e.get(out, i);
+				addErr += oe;
+				float reparin = (a.get(in, i)-mean)*scal*r+d;
+				multErr += reparin * oe;
+
+
+			}
+			if(hasAdd)
+				gradients.add(add, i, addErr);
+			gradients.add(mult, i, multErr);
+//				gradients.set(runningMean, i, 0);
+//				gradients.add(runningVar, i, 0);
+		}
 	}
 	@Override
 	public void dontComputeInPhase(String phase) {
@@ -368,5 +536,10 @@ public class BatchReNorm implements InOutScaleBiasModule{
 	public ParamBlock getScale() {
 		return mult;
 	}
-
+	public BatchReNorm parallel(int threads) {
+		if(threads<1)
+			throw new IllegalArgumentException();
+		par = threads;
+		return this;
+	}
 }
