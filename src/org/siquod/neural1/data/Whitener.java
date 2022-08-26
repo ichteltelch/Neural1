@@ -1,6 +1,9 @@
 package org.siquod.neural1.data;
 
+import static java.lang.Math.sqrt;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -11,6 +14,7 @@ import java.util.function.Consumer;
 
 public interface Whitener {
 	void whiten(double[] in, double[] out);
+	void whiten(float[] in, float[] out);
 	int dim();
 	static class GaussianWhitener implements Whitener{
 		public final double[] µ;
@@ -23,6 +27,12 @@ public interface Whitener {
 		public void whiten(double[] in, double[] out) {
 			for(int i=0; i<µ.length; ++i) {
 				out[i] = (in[i]-µ[i])*invSigma[i];
+			}
+		}
+		@Override
+		public void whiten(float[] in, float[] out) {
+			for(int i=0; i<µ.length; ++i) {
+				out[i] = (float)((in[i]-µ[i])*invSigma[i]);
 			}
 		}
 		/**
@@ -101,10 +111,48 @@ public interface Whitener {
 			}
 		}
 	}
+	static class MultivariateGaussianWhitener implements Whitener{
+		public final double[] µ;
+		public final double[][] invSigma;
+		public MultivariateGaussianWhitener(double[] µ, double[][] invSigma) {
+			this.µ=µ;
+			this.invSigma=invSigma;
+		}
+		@Override
+		public void whiten(double[] in, double[] out) {
+			for(int i=0; i<µ.length; ++i) {
+				double sum = 0;
+				for(int j=0; j<µ.length; ++j){
+					sum += (in[j]-µ[j])*invSigma[i][j];
+				}
+				out[i] = sum;
+			}
+		}
+		@Override
+		public void whiten(float[] in, float[] out) {
+			for(int i=0; i<µ.length; ++i) {
+				float sum = 0;
+				for(int j=0; j<µ.length; ++j){
+					sum += (in[j]-µ[j])*invSigma[i][j];
+				}
+				out[i] = sum;
+			}
+		}
+		@Override
+		public int dim() {
+			return µ.length;
+		}
+
+	}
 	public static GaussianWhitener gaussianForInputs(TrainingBatchCursor data) {
 		int dim = data.inputCount();
 		Consumer<double[]> give = data::giveInputs;
 		return makeGaussianWhitener(data, dim, give);
+	}
+	public static MultivariateGaussianWhitener multivariateGaussianForInputs(TrainingBatchCursor data, double regularization) {
+		int dim = data.inputCount();
+		Consumer<double[]> give = data::giveInputs;
+		return makeMultivatiateGaussianWhitener(data, dim, give, regularization);
 	}
 	public static GaussianWhitener gaussianForOutputs(TrainingBatchCursor data) {
 		int dim = data.outputCount();
@@ -179,6 +227,100 @@ public interface Whitener {
 			sigma[i]=Math.sqrt(isNorm/(sigma[i]+1e-8));
 		return new GaussianWhitener(µ, sigma);
 	}
+	static MultivariateGaussianWhitener makeMultivatiateGaussianWhitener(TrainingBatchCursor data, int dim, Consumer<double[]> give, double regularization) {
+		double[] µ=new double[dim];
+		double[] buffer=new double[dim];
+		double n=0;
+		data.reset();
+		boolean all1=true;
+		while(!data.isFinished()) {
+			double w = data.getWeight();
+			all1 &= w==1;
+			n+=w;
+			give.accept(buffer);
+			for(int i=0; i<dim; ++i)
+				µ[i]+=w*buffer[i];
+			data.next();
+		}
+		double µNorm=1/n;
+		for(int i=0; i<dim; ++i)
+			µ[i]*=µNorm;
+		double[][] sigma = new double[dim][dim];
+		data.reset();
+		while(!data.isFinished()) {
+			give.accept(buffer);
+			for(int i=0; i<dim; ++i) 
+				buffer[i] -= µ[i];
+			double weight = data.getWeight();
+			for(int i=0; i<dim; ++i) {
+				double biw = buffer[i]*weight;
+				for(int j=i; j<dim; ++j) 
+					sigma[i][j]+=biw*buffer[j];
+			}
+			
+			data.next();
+		}
+
+		double isNorm=(all1?n-1:n);
+		for(int i=0; i<dim; ++i) {
+			
+			sigma[i][i] = sigma[i][i]/isNorm;
+			for(int j=i+1; j<dim; ++j) {
+				sigma[j][i] = sigma[i][j] /= isNorm;
+			}
+		}
+//		double[][] sigmaCopy = copy(dim, sigma, null);
+		double[][] invSigma = new double[dim][dim];
+		double[][] basis = new double[dim][dim];
+		double[] eigenvalues = new double[dim];
+		eigen(dim, sigma, sigma, null, basis, eigenvalues, 100);
+		System.out.println();
+		for(int i=0; i<dim; ++i) {
+			eigenvalues[i] = 1/Math.max(Math.sqrt(eigenvalues[i]), regularization);
+		}
+		deDiagonalize(dim, invSigma, basis, eigenvalues, new double[dim][dim]);
+		
+		double[] sigma2 = new double[dim];
+		data.reset();
+		while(!data.isFinished()) {
+			give.accept(buffer);
+			double w = data.getWeight();
+			for(int i=0; i<µ.length; ++i) {
+				double sum = 0;
+				for(int j=0; j<µ.length; ++j){
+					sum += (buffer[j]-µ[j])*invSigma[i][j];
+				}
+				sigma2[i] += w * sum*sum;
+			}
+			data.next();
+		}
+		double[] invSigma2 = sigma2;
+		for(int i=0; i<dim; ++i)
+			invSigma2[i]=Math.sqrt(isNorm/(sigma2[i]+1e-8));
+		for(int i=0; i<dim; ++i) {
+			for(int j=0; j<dim; ++j) {
+				invSigma[i][j] *= invSigma2[i];
+			}
+			
+		}
+
+
+//		if(true) {
+//			double[][] check = new double[dim][dim];
+//			mul(sigmaCopy, invSigma, check);
+//			System.out.println();
+//		}
+		return new MultivariateGaussianWhitener(µ, invSigma);
+	}
+	static double[][] copy(int dim, double[][] mat, double[][] matCopy) {
+		if(matCopy==null)
+			matCopy = new double[dim][dim];
+		for(int i=0; i<dim; ++i) {
+			System.arraycopy(mat[i], 0, matCopy[i], 0, dim);
+		}
+		return matCopy;
+	}
+	
 	static class MutBool{boolean val; MutBool(boolean v){val=v;}}
 	static class MutDouble{double val; MutDouble(double v){val=v;}}
 	static GaussianWhitener makeGaussianWhitener(TrainingBatchCursor[] datas, int dim, Consumer<double[]>[] gives, ExecutorService exec) throws InterruptedException {
@@ -371,5 +513,234 @@ public interface Whitener {
 			throw new IllegalArgumentException("throwCause(): Argument has no cause", e);
 		else 
 			throw new IllegalArgumentException("throwCause(): Cause of the argument is checked", e);
+	}
+	
+	public static void invert(int dim, double[][] rows, double[][] inv) {
+		setUnit(dim, inv);
+		for(int r=0; r<dim; r++){
+			{
+				int mpr=r;
+				for(int pr=r+1; pr<dim; pr++)
+					if(Math.abs(rows[pr][r])>Math.abs(rows[mpr][r]))
+						mpr=pr;
+				if(mpr!=r){
+					double[] tr=rows[r];
+					rows[r]=rows[mpr];
+					rows[mpr]=tr;
+
+					tr=inv[r];
+					inv[r]=inv[mpr];
+					inv[mpr]=tr;
+				}
+			}
+			{
+				double[] row=rows[r];
+				double pivot_ = row[r];
+				for(int r2=r+1; r2<dim; r2++){
+					double[] row2=rows[r2];
+					double head = row2[r];
+					
+					double size = Math.max(Math.abs(head),Math.abs(pivot_));
+					double digits = Math.round(Math.log(size)/Math.log(2));
+					double renorm = Math.pow(2, -Math.round(digits));
+					
+					double pivot=pivot_*renorm;
+					head*=renorm;
+					row2[r] = 0;
+					for(int col=r+1; col<dim; col++){
+						row2[col] = row2[col] * pivot - row[col] * head;
+					}
+					for(int n=0; n<dim; n++){
+						inv[r2][n] = inv[r2][n] * pivot - inv[r][n] * head;
+					}
+				}
+			}
+		}
+		for(int r=dim-1; r>=0; r--){
+			double norm=1/rows[r][r];
+			for(int c=r; c<dim; c++)
+				rows[r][c]*=norm;
+			for(int c=0; c<dim; c++)
+				inv[r][c] *= norm;
+			for(int r2=r-1; r2>=0; r2--){
+				double factor = -rows[r2][r];
+				rows[r2][r]=0;
+				for(int c=0; c<dim; c++)
+					inv[r2][c] += inv[r][c]*factor;
+			}
+		}
+
+
+	}
+	public static void setUnit(int dim, double[][] inv) {
+		for(int i=0; i<dim; ++i) {
+			double[] row = inv[i];
+			Arrays.fill(row, 0);
+			row[i]=1;
+		}
+	}
+	public static void mul(double[][] m1, double[][] m2, double[][] out) {
+		for(int row=0; row<m1.length; row++){
+			for(int col=0; col<m2[0].length; col++){
+				double s=0;
+				for(int i=0; i<m2.length; i++)
+					s += m1[row][i]*m2[i][col];
+				out[row][col]=s;
+			}
+		}
+	}
+	
+	public static void main(String[] args) {
+		double[][] is = {
+				{1,0},
+//				{-1,0},
+				{0,2},
+//				{0,-2},
+				{1,1},
+//				{-1,-1},
+		};
+		double[] ws = new double[is.length];
+		Arrays.fill(ws, 2);
+		TrainingBatchCursor test = new TrainingBatchCursor.RamBuffer(is, new double[is.length][0], ws, 0, 2, 0);
+		double regularization=0;
+		Whitener w1 = multivariateGaussianForInputs(test, regularization);
+		TrainingBatchCursor whitened = test.whitened(w1, null);
+		Whitener w2 = multivariateGaussianForInputs(whitened, regularization);
+
+	}
+	
+	public static void eigen(int dim, double[][] of, double[][] use, double[][] basisGuess, double[][] outBasis, double[] values, int iter){
+		if(use == null)
+			use=copy(dim, of, null);
+		else if(use!=of)
+			use=copy(dim, of, use);
+
+		if(basisGuess==null)
+			setUnit(dim, outBasis);
+		else{
+			if(basisGuess==outBasis){
+				preDiagonalize(dim, use, basisGuess, new double[dim][dim]);
+			}else{
+				preDiagonalize(dim, use, basisGuess, outBasis);
+				copy(dim, basisGuess, outBasis);
+			}
+		}
+		dynDiagonalize(dim, use, outBasis, iter);
+		for(int i=0; i<dim; i++)
+			values[i]=use[i][i];
+		
+	}
+	public static double[][] dynDiagonalize(int dim, double[][] e, double[][] outBasis, int iter){
+		double[][] rot=outBasis;
+		for(int itt=0; itt<iter; itt++){
+			for(int _i=0; _i<dim; _i++)
+				for(int _j=_i+1; _j<dim; _j++){
+					int i, j;
+					if((iter&1)==0){
+						i=_i;
+						j=_j;						
+					}else{
+						i=dim-_i-1;
+						j=dim-_j-1;						
+					}
+					//set e[i][j] to 0 while maintaining that M = rot × this × rot^-1
+					double sin, cos;
+
+					double v=e[j][j], y=e[i][i], w=e[j][i];
+//					double wq=w*w, vy=v*y, vpy=v+y;
+					@SuppressWarnings("unused")
+					double l1, l2;
+					double sqw=w*w;
+					double nph=(v+y)*.5, q = v*y-sqw, detv = (nph*nph-q);
+					if(detv<=0)
+						continue;
+					double sqrtdeth=sqrt(detv);
+					l1 = nph + sqrtdeth;
+					l2 = nph - sqrtdeth;
+
+
+					double yl=y-l1;
+					double vl=v-l1;
+					double norm1=sqw+yl*yl;
+					double norm2=sqw+vl*vl;
+					if(norm1>norm2){
+						norm1=(double) (1/sqrt(norm1));
+						sin = w*norm1;
+						cos = yl*norm1;
+					}else{
+						norm2=(double) (1/sqrt(norm2));
+						cos = w*norm2;
+						sin = vl*norm2;
+					}
+
+
+
+//					double t1= (v-y)*cos*sin + w*cos*cos - w*sin*sin ;
+//					double t2=  cos*cos +   sin*sin ;
+
+					rotR(dim, rot, j, i, -cos, -sin);
+					rotL(dim, e, j, i, -cos, sin);
+					rotR(dim, e, j, i, -cos, -sin);
+					e[j][i]=e[i][j]=0;
+				}
+		}
+		return e;
+	}
+	public static double[][] preDiagonalize(int dim, double[][] on, double[][] basis, double[][] t) {
+		//basis^T x this x basis = (this^T x basis)^T x basis
+		//transpose(); //unnecessary: is symmetric
+		mul(on, basis, t);
+		transposeInPlace(dim, t);
+		mul(t, basis, on);
+		return on;
+	}
+	public static void transposeInPlace(int dim, double[][] e){
+		for(int i=0; i<dim; i++)
+			for(int j=i+1; j<dim; j++){
+				double t=e[i][j];
+				e[i][j]=e[j][i];
+				e[j][i]=t;
+			}
+	}
+	public static void rotR(int dim, double[][] e, int i, int j, double cos, double sin){
+		for(int a=0; a<dim; a++){
+			double aj=e[a][j];
+			double ai=e[a][i];
+			e[a][i] = ai*cos - sin*aj;  
+			e[a][j] = aj*cos + sin*ai;
+		}
+	}
+
+
+	public static void rotL(int dim, double[][] e, int i, int j, double cos, double sin){
+		for(int a=0; a<dim; a++){
+			double ja=e[j][a];
+			double ia=e[i][a];
+			e[i][a] = cos*ia + sin*ja;  
+			e[j][a] = cos*ja - sin*ia;
+		}
+
+	}
+	public static double[][] deDiagonalize(int dim, double[][] e, double[][] basis, double[] diag, double[][] t) {
+		if(t==null)
+			t= new double[dim][dim];
+		for(int i=0; i<dim; ++i) {
+			double ev = diag[i];
+			for(int j=0; j<dim; ++j) {
+				t[j][i] = basis[j][i] * ev;
+			} 
+		}		
+		mulTranspose(dim, t, basis, e);
+		return e;
+	}
+	public static double[][] mulTranspose(double dim, double[][] m1, double[][] m2, double[][] out){
+		for(int i=0; i<dim; i++)
+			for(int j=0; j<dim; j++){
+				double sum=0;
+				for(int k=0; k<dim; k++)
+					sum+=m1[i][k]*m2[j][k];
+				out[i][j]=sum;
+			}
+		return out;
 	}
 }
