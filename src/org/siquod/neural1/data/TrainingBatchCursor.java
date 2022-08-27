@@ -237,6 +237,13 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 			}
 			return truncated;
 		}
+		default RandomAccess remap(int[] outputMapping, int... inputMapping) {
+			return new RemappedCursor.RandomAccess(this, outputMapping, inputMapping);
+		}
+
+	}
+	default TrainingBatchCursor remap(int[] outputMapping, int... inputMapping) {
+		return new RemappedCursor<TrainingBatchCursor>(this, outputMapping, inputMapping);
 	}
 	
 	
@@ -665,7 +672,7 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 		}
 		@Override
 		public double getWeight() {
-			return ws[at];
+			return ws==null?1:ws[at];
 		}
 		@Override
 		public long size() {
@@ -745,6 +752,68 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 			return new WhitenedTrainingBatchCursor<B>((B)((TrainingBatchCursor)back).clone(), whitenInputs, whitenOutputs);
 		}
 		
+	}
+	public static class RemappedCursor<B extends TrainingBatchCursor> implements TrainingBatchCursor{
+		int[] inputMapping;
+		int[] outputMapping;
+		public final B original;
+		final int ic;
+		final int oc;
+		final double[] buffer;
+		@SuppressWarnings("unchecked")
+		@Override
+		public RemappedCursor<B> clone() {
+			return new RemappedCursor<B>((B)((TrainingBatchCursor)original).clone(), outputMapping, inputMapping);
+		}
+		public RemappedCursor(B back, int[] outputMapping, int...inputMapping) {
+			original = back;
+			this.inputMapping = inputMapping;
+			ic = inputMapping==null?back.inputCount():inputMapping.length;
+			this.outputMapping = outputMapping;
+			oc = outputMapping==null?back.outputCount():outputMapping.length;
+			buffer = new double[Math.max(back.inputCount(), back.outputCount())];
+		}
+		@Override public int inputCount() {return ic;}
+		@Override public int outputCount() {return oc;}
+		@Override public void giveInputs(double[] inputs) {
+			if(inputMapping==null) 
+				original.giveInputs(inputs);
+			else {
+				original.giveInputs(buffer);
+				for(int i=0; i<ic; ++i) {
+					inputs[i]=buffer[inputMapping[i]];
+				}
+			}
+		}
+
+		@Override
+		public void giveOutputs(double[] outputs) {
+			if(outputMapping==null) 
+				original.giveOutputs(outputs);
+			else {
+				original.giveOutputs(buffer);
+				for(int i=0; i<ic; ++i) {
+					outputs[i]=buffer[outputMapping[i]];
+				}
+			}			
+		}
+		@Override public double getWeight() {return original.getWeight();}
+		@Override public void next() {original.next();}
+		@Override public boolean isFinished() {return original.isFinished();}
+		@Override public void reset() {original.reset();}
+		static class RandomAccess extends RemappedCursor<TrainingBatchCursor.RandomAccess> implements TrainingBatchCursor.RandomAccess{
+
+			public RandomAccess(TrainingBatchCursor.RandomAccess back, int[] outputMapping, int... inputMapping) {
+				super(back, outputMapping, inputMapping);
+			}
+
+			@Override public long size() {return original.size();}
+			@Override public void seek(long position) {original.seek(position);}
+			@Override public RemappedCursor.RandomAccess clone() {
+				return new RemappedCursor.RandomAccess(original, outputMapping, inputMapping);
+			}
+			
+		}
 	}
 	
 }
