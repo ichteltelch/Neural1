@@ -150,10 +150,10 @@ public interface Whitener {
 		Consumer<double[]> give = data::giveInputs;
 		return makeGaussianWhitener(data, dim, give);
 	}
-	public static MultivariateGaussianWhitener multivariateGaussianForInputs(TrainingBatchCursor data, double regularization) {
+	public static MultivariateGaussianWhitener multivariateGaussianForInputs(TrainingBatchCursor data, double regularization, boolean preWhiten) {
 		int dim = data.inputCount();
 		Consumer<double[]> give = data::giveInputs;
-		return makeMultivatiateGaussianWhitener(data, dim, give, regularization);
+		return makeMultivatiateGaussianWhitener(data, dim, give, regularization, preWhiten);
 	}
 	public static GaussianWhitener gaussianForOutputs(TrainingBatchCursor data) {
 		int dim = data.outputCount();
@@ -228,7 +228,7 @@ public interface Whitener {
 			sigma[i]=Math.sqrt(isNorm/(sigma[i]+1e-8));
 		return new GaussianWhitener(µ, sigma);
 	}
-	static MultivariateGaussianWhitener makeMultivatiateGaussianWhitener(TrainingBatchCursor data, int dim, Consumer<double[]> give, double regularization) {
+	static MultivariateGaussianWhitener makeMultivatiateGaussianWhitener(TrainingBatchCursor data, int dim, Consumer<double[]> give, double regularization, boolean preWhiten) {
 		double[] µ=new double[dim];
 		double[] buffer=new double[dim];
 		double n=0;
@@ -249,23 +249,27 @@ public interface Whitener {
 
 
 		double[] sigma0 = new double[dim];
-		data.reset();
-		while(!data.isFinished()) {
-			give.accept(buffer);
-			double w = data.getWeight();
-			for(int i=0; i<dim; ++i) {
-				double diff=buffer[i]-µ[i];
-				sigma0[i]+=diff*diff*w;
-			}
-			data.next();
-		}
-		double isNorm=(all1?n-1:n);
 		double[] invSigma0 = sigma0;
+		double isNorm=(all1?n-1:n);
 
-		for(int i=0; i<dim; ++i)
-			invSigma0[i]=Math.sqrt(isNorm/(sigma0[i]+1e-8));
-		
-//		Arrays.fill(invSigma0, 1);
+		if(preWhiten) {
+			data.reset();
+			while(!data.isFinished()) {
+				give.accept(buffer);
+				double w = data.getWeight();
+				for(int i=0; i<dim; ++i) {
+					double diff=buffer[i]-µ[i];
+					sigma0[i]+=diff*diff*w;
+				}
+				data.next();
+			}
+			for(int i=0; i<dim; ++i)
+				invSigma0[i]=Math.sqrt(isNorm/(sigma0[i]+1e-8));
+		}else {
+			Arrays.fill(invSigma0, 1);
+
+		}
+
 
 		double[][] sigma = new double[dim][dim];
 		data.reset();
@@ -297,12 +301,12 @@ public interface Whitener {
 		double[][] basis = new double[dim][dim];
 		double[] eigenvalues = new double[dim];
 		eigen(dim, sigma, sigma, null, basis, eigenvalues, 100);
-//		System.out.println();
+		//		System.out.println();
 		for(int i=0; i<dim; ++i) {
 			eigenvalues[i] = 1/Math.max(Math.sqrt(Math.max(0, eigenvalues[i])), regularization);
 		}
 		deDiagonalize(dim, invSigma, basis, eigenvalues, new double[dim][dim]);
-//		transposeInPlace(dim, basis);
+		transposeInPlace(dim, basis);
 		double[] sigma2 = new double[dim+0];
 		data.reset();
 		while(!data.isFinished()) {
@@ -324,7 +328,7 @@ public interface Whitener {
 			invSigma2[i]=Math.sqrt(isNorm/(sigma2[i]+1e-8));
 		for(int i=0; i<dim; ++i) {
 			for(int j=0; j<dim; ++j) {
-				invSigma[i][j] *= invSigma2[i]*invSigma0[i];
+				invSigma[i][j] *= invSigma2[i]*invSigma0[j];
 			}
 
 		}
@@ -784,14 +788,14 @@ public interface Whitener {
 				x/=norm;
 				y/=norm;
 				z/=norm;
-//				if(y<-0.5) {
-//					--j;
-//					continue;
-//				}
-//				if(Math.abs(x-0.1)>0.6) {
-//					--j;
-//					continue;
-//				}
+				//				if(y<-0.5) {
+				//					--j;
+				//					continue;
+				//				}
+				//				if(Math.abs(x-0.1)>0.6) {
+				//					--j;
+				//					continue;
+				//				}
 				double[] feat0 = {
 						x, y, z,   					//0 1 2 
 						x*x, x*y, x*z,              //3 4 5
@@ -835,6 +839,6 @@ public interface Whitener {
 		}
 
 		TrainingBatchCursor c = new TrainingBatchCursor.RamBuffer(vs, new double[n][0], null, 0, vs[0].length, 0);
-		Whitener w = Whitener.multivariateGaussianForInputs(c, 0.0001);
+		Whitener w = Whitener.multivariateGaussianForInputs(c, 0.0001, true);
 	}
 }
