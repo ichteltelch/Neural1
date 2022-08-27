@@ -5,6 +5,7 @@ import static java.lang.Math.sqrt;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -63,7 +64,7 @@ public interface Whitener {
 			}
 			pOut[last]=acc;
 			return pOut;
-			
+
 		}
 		/**
 		 * Given logistic regression parameters that work on colored data, transform them into equivalent
@@ -94,7 +95,7 @@ public interface Whitener {
 			}
 			pOut[last]=acc;
 			return pOut;
-			
+
 		}
 		@Override
 		public int dim() {
@@ -245,50 +246,74 @@ public interface Whitener {
 		double µNorm=1/n;
 		for(int i=0; i<dim; ++i)
 			µ[i]*=µNorm;
+
+
+		double[] sigma0 = new double[dim];
+		data.reset();
+		while(!data.isFinished()) {
+			give.accept(buffer);
+			double w = data.getWeight();
+			for(int i=0; i<dim; ++i) {
+				double diff=buffer[i]-µ[i];
+				sigma0[i]+=diff*diff*w;
+			}
+			data.next();
+		}
+		double isNorm=(all1?n-1:n);
+		double[] invSigma0 = sigma0;
+
+		for(int i=0; i<dim; ++i)
+			invSigma0[i]=Math.sqrt(isNorm/(sigma0[i]+1e-8));
+		
+//		Arrays.fill(invSigma0, 1);
+
 		double[][] sigma = new double[dim][dim];
 		data.reset();
 		while(!data.isFinished()) {
 			give.accept(buffer);
 			for(int i=0; i<dim; ++i) 
-				buffer[i] -= µ[i];
+				buffer[i] = (buffer[i]-µ[i])*invSigma0[i];
 			double weight = data.getWeight();
 			for(int i=0; i<dim; ++i) {
 				double biw = buffer[i]*weight;
 				for(int j=i; j<dim; ++j) 
 					sigma[i][j]+=biw*buffer[j];
 			}
-			
+
 			data.next();
 		}
 
-		double isNorm=(all1?n-1:n);
+
+
 		for(int i=0; i<dim; ++i) {
-			
+
 			sigma[i][i] = sigma[i][i]/isNorm;
 			for(int j=i+1; j<dim; ++j) {
 				sigma[j][i] = sigma[i][j] /= isNorm;
 			}
 		}
-//		double[][] sigmaCopy = copy(dim, sigma, null);
+		//		double[][] sigmaCopy = copy(dim, sigma, null);
 		double[][] invSigma = new double[dim][dim];
 		double[][] basis = new double[dim][dim];
 		double[] eigenvalues = new double[dim];
 		eigen(dim, sigma, sigma, null, basis, eigenvalues, 100);
-		System.out.println();
+//		System.out.println();
 		for(int i=0; i<dim; ++i) {
-			eigenvalues[i] = 1/Math.max(Math.sqrt(eigenvalues[i]), regularization);
+			eigenvalues[i] = 1/Math.max(Math.sqrt(Math.max(0, eigenvalues[i])), regularization);
 		}
 		deDiagonalize(dim, invSigma, basis, eigenvalues, new double[dim][dim]);
-		
-		double[] sigma2 = new double[dim];
+//		transposeInPlace(dim, basis);
+		double[] sigma2 = new double[dim+0];
 		data.reset();
 		while(!data.isFinished()) {
 			give.accept(buffer);
 			double w = data.getWeight();
+			for(int i=0; i<dim; ++i) 
+				buffer[i] = (buffer[i]-µ[i])*invSigma0[i];
 			for(int i=0; i<µ.length; ++i) {
 				double sum = 0;
 				for(int j=0; j<µ.length; ++j){
-					sum += (buffer[j]-µ[j])*invSigma[i][j];
+					sum += buffer[j]*invSigma[i][j];
 				}
 				sigma2[i] += w * sum*sum;
 			}
@@ -299,17 +324,17 @@ public interface Whitener {
 			invSigma2[i]=Math.sqrt(isNorm/(sigma2[i]+1e-8));
 		for(int i=0; i<dim; ++i) {
 			for(int j=0; j<dim; ++j) {
-				invSigma[i][j] *= invSigma2[i];
+				invSigma[i][j] *= invSigma2[i]*invSigma0[i];
 			}
-			
+
 		}
 
 
-//		if(true) {
-//			double[][] check = new double[dim][dim];
-//			mul(sigmaCopy, invSigma, check);
-//			System.out.println();
-//		}
+		//		if(true) {
+		//			double[][] check = new double[dim][dim];
+		//			mul(sigmaCopy, invSigma, check);
+		//			System.out.println();
+		//		}
 		return new MultivariateGaussianWhitener(µ, invSigma);
 	}
 	static double[][] copy(int dim, double[][] mat, double[][] matCopy) {
@@ -320,18 +345,18 @@ public interface Whitener {
 		}
 		return matCopy;
 	}
-	
+
 	static class MutBool{boolean val; MutBool(boolean v){val=v;}}
 	static class MutDouble{double val; MutDouble(double v){val=v;}}
 	static GaussianWhitener makeGaussianWhitener(TrainingBatchCursor[] datas, int dim, Consumer<double[]>[] gives, ExecutorService exec) throws InterruptedException {
 		int threads = datas.length;
-		
+
 
 		double[][] µs=new double[threads][dim];
 		double[][] buffers=new double[threads][dim];
 		MutBool all1s=new MutBool(true);
 		MutDouble ns = new MutDouble(0);
-		
+
 		Runnable[] jobs = new Runnable[threads];
 		for(int jobId = 0; jobId<threads; ++jobId) {
 			TrainingBatchCursor data = datas[jobId];
@@ -342,7 +367,7 @@ public interface Whitener {
 				data.reset();
 				boolean all1=true;
 				double n=0;
-	
+
 				while(!data.isFinished()) {
 					double w = data.getWeight();
 					all1 &= w==1;
@@ -367,8 +392,8 @@ public interface Whitener {
 			for(int i=0; i<µ.length; ++i)
 				µ[i] += b[i];
 		}
-		
-		
+
+
 		double µNorm=1/n;
 		for(int i=0; i<dim; ++i)
 			µ[i]*=µNorm;
@@ -446,36 +471,36 @@ public interface Whitener {
 				System.out.println("No variance group assigned: index "+i);
 		return new GaussianWhitener(µ, invSigma);
 	}
-//	public static void main(String[] args) throws InterruptedException {
-//		int n = 1000000;
-//		double[][] inputs  = new double[n][2];
-//		double[] outputs = new double[n];
-//		double[] idealParams = {5, 2, -0.5};
-//		double sigma0 = 2;
-//		double sigma1 = 3;
-//		double µ0 = -.1;
-//		double µ1 = -.2;
-//		Random r = new Random(42);
-//		for(int i=0; i<n; ++i) {
-//			double[] inp = inputs[i];
-//			inp[0] = µ0 + sigma0*r.nextGaussian();
-//			inp[1] = µ1 + sigma1*r.nextGaussian();
-//			double p = LogisticRegression.classify(inp, idealParams);
-//			outputs[i] = p>r.nextDouble()?1:0;
-//		}
-//		RandomAccess data = TrainingBatchCursor.forArray(inputs, outputs);
-//		GaussianWhitener whitener = Whitener.gaussianForInputs(data.split(4));
-//		RandomAccess whiteData = data.whitened(whitener, null);
-//		double[] whiteParams = new double[3];
-//		LogisticRegression.newton(whiteData, whiteParams, 1e-10, 1000, 0);
-//		double[] colorParams = new double[3];
-//		whitener.colorizeLogisticRegressionParams(whiteParams, colorParams);
-//		double[] whiteParams2 = new double[3];
-//		whitener.whitenLogisticRegressionParams(colorParams, whiteParams2);
-//		System.out.println(Arrays.toString(whiteParams));
-//		System.out.println(Arrays.toString(whiteParams2));
-//
-//	}
+	//	public static void main(String[] args) throws InterruptedException {
+	//		int n = 1000000;
+	//		double[][] inputs  = new double[n][2];
+	//		double[] outputs = new double[n];
+	//		double[] idealParams = {5, 2, -0.5};
+	//		double sigma0 = 2;
+	//		double sigma1 = 3;
+	//		double µ0 = -.1;
+	//		double µ1 = -.2;
+	//		Random r = new Random(42);
+	//		for(int i=0; i<n; ++i) {
+	//			double[] inp = inputs[i];
+	//			inp[0] = µ0 + sigma0*r.nextGaussian();
+	//			inp[1] = µ1 + sigma1*r.nextGaussian();
+	//			double p = LogisticRegression.classify(inp, idealParams);
+	//			outputs[i] = p>r.nextDouble()?1:0;
+	//		}
+	//		RandomAccess data = TrainingBatchCursor.forArray(inputs, outputs);
+	//		GaussianWhitener whitener = Whitener.gaussianForInputs(data.split(4));
+	//		RandomAccess whiteData = data.whitened(whitener, null);
+	//		double[] whiteParams = new double[3];
+	//		LogisticRegression.newton(whiteData, whiteParams, 1e-10, 1000, 0);
+	//		double[] colorParams = new double[3];
+	//		whitener.colorizeLogisticRegressionParams(whiteParams, colorParams);
+	//		double[] whiteParams2 = new double[3];
+	//		whitener.whitenLogisticRegressionParams(colorParams, whiteParams2);
+	//		System.out.println(Arrays.toString(whiteParams));
+	//		System.out.println(Arrays.toString(whiteParams2));
+	//
+	//	}
 	public static void parallel(ExecutorService exec, Runnable... rs) throws InterruptedException {
 		ArrayList<Future<?>> fs=new ArrayList<>(rs.length);
 		for(Runnable run: rs) {
@@ -514,7 +539,7 @@ public interface Whitener {
 		else 
 			throw new IllegalArgumentException("throwCause(): Cause of the argument is checked", e);
 	}
-	
+
 	public static void invert(int dim, double[][] rows, double[][] inv) {
 		setUnit(dim, inv);
 		for(int r=0; r<dim; r++){
@@ -539,11 +564,11 @@ public interface Whitener {
 				for(int r2=r+1; r2<dim; r2++){
 					double[] row2=rows[r2];
 					double head = row2[r];
-					
+
 					double size = Math.max(Math.abs(head),Math.abs(pivot_));
 					double digits = Math.round(Math.log(size)/Math.log(2));
 					double renorm = Math.pow(2, -Math.round(digits));
-					
+
 					double pivot=pivot_*renorm;
 					head*=renorm;
 					row2[r] = 0;
@@ -589,26 +614,26 @@ public interface Whitener {
 			}
 		}
 	}
-	
-	public static void main(String[] args) {
-		double[][] is = {
-				{1,0},
-//				{-1,0},
-				{0,2},
-//				{0,-2},
-				{1,1},
-//				{-1,-1},
-		};
-		double[] ws = new double[is.length];
-		Arrays.fill(ws, 2);
-		TrainingBatchCursor test = new TrainingBatchCursor.RamBuffer(is, new double[is.length][0], ws, 0, 2, 0);
-		double regularization=0;
-		Whitener w1 = multivariateGaussianForInputs(test, regularization);
-		TrainingBatchCursor whitened = test.whitened(w1, null);
-		Whitener w2 = multivariateGaussianForInputs(whitened, regularization);
 
-	}
-	
+	//	public static void main(String[] args) {
+	//		double[][] is = {
+	//				{1,0},
+	////				{-1,0},
+	//				{0,2},
+	////				{0,-2},
+	//				{1,1},
+	////				{-1,-1},
+	//		};
+	//		double[] ws = new double[is.length];
+	//		Arrays.fill(ws, 2);
+	//		TrainingBatchCursor test = new TrainingBatchCursor.RamBuffer(is, new double[is.length][0], ws, 0, 2, 0);
+	//		double regularization=0;
+	//		Whitener w1 = multivariateGaussianForInputs(test, regularization);
+	//		TrainingBatchCursor whitened = test.whitened(w1, null);
+	//		Whitener w2 = multivariateGaussianForInputs(whitened, regularization);
+	//
+	//	}
+
 	public static void eigen(int dim, double[][] of, double[][] use, double[][] basisGuess, double[][] outBasis, double[] values, int iter){
 		if(use == null)
 			use=copy(dim, of, null);
@@ -628,7 +653,7 @@ public interface Whitener {
 		dynDiagonalize(dim, use, outBasis, iter);
 		for(int i=0; i<dim; i++)
 			values[i]=use[i][i];
-		
+
 	}
 	public static double[][] dynDiagonalize(int dim, double[][] e, double[][] outBasis, int iter){
 		double[][] rot=outBasis;
@@ -647,7 +672,7 @@ public interface Whitener {
 					double sin, cos;
 
 					double v=e[j][j], y=e[i][i], w=e[j][i];
-//					double wq=w*w, vy=v*y, vpy=v+y;
+					//					double wq=w*w, vy=v*y, vpy=v+y;
 					@SuppressWarnings("unused")
 					double l1, l2;
 					double sqw=w*w;
@@ -675,8 +700,8 @@ public interface Whitener {
 
 
 
-//					double t1= (v-y)*cos*sin + w*cos*cos - w*sin*sin ;
-//					double t2=  cos*cos +   sin*sin ;
+					//					double t1= (v-y)*cos*sin + w*cos*cos - w*sin*sin ;
+					//					double t2=  cos*cos +   sin*sin ;
 
 					rotR(dim, rot, j, i, -cos, -sin);
 					rotL(dim, e, j, i, -cos, sin);
@@ -742,5 +767,74 @@ public interface Whitener {
 				out[i][j]=sum;
 			}
 		return out;
+	}
+	@SuppressWarnings("unused")
+	public static void mainz(String[] args) {
+		int m = 10;
+		int n = 1000;
+		double[][] vs = new double[n][];
+		double[][] pvs = new double[m][];
+		Random r = new Random(123);
+		for(int i=0; i<n; ++i) {
+			for(int j=0; j<m; ++j) {
+				double x = r.nextGaussian();
+				double y = r.nextGaussian();
+				double z = r.nextGaussian();
+				double norm = Math.sqrt(x*x+y*y+z*z);
+				x/=norm;
+				y/=norm;
+				z/=norm;
+//				if(y<-0.5) {
+//					--j;
+//					continue;
+//				}
+//				if(Math.abs(x-0.1)>0.6) {
+//					--j;
+//					continue;
+//				}
+				double[] feat0 = {
+						x, y, z,   					//0 1 2 
+						x*x, x*y, x*z,              //3 4 5
+						y*y, y*z,                   //6 7
+						//z*z,                        //8
+						x*x*x, x*x*y, /*x*x*z,*/        //9 10 11
+						/*x*y*y,*/ x*y*z,               //12 13
+						x*z*z,                      //14
+						y*y*y, y*y*z,               //15 16
+						/*y*z*z,*/                      //17
+						z*z*z,                      //18
+				};
+				double[] feat1 = {
+						x, x*x, x*y, y*y, x*x*x, x*x*y, x*z*z, y*y*y
+				};
+				double[] feat2 = {
+						x, y, z,   					//0 1 2 
+						x*x, x*y, x*z,              //3 4 5
+						y*y, y*z,                   //6 7
+						//z*z,                        //8
+						/*x*x*x,*/ x*x*y, x*x*z,        //9 10 11
+						x*y*y, x*y*z,               //12 13
+						x*z*z,                      //14
+						/*y*y*y, */y*y*z,               //15 16
+						y*z*z,                      //17
+						//z*z*z,                      //18
+				};
+				pvs[j]=feat0;
+			}
+			int l = pvs[0].length;
+			double[] a = new double[l];
+			for(int j=0; j<m; ++j) {
+				for(int k=0; k<l; ++k) {
+					a[k] += pvs[j][k];
+				}
+			}
+			for(int k=0; k<l; ++k) {
+				a[k] /= m;
+			}
+			vs[i]=a;
+		}
+
+		TrainingBatchCursor c = new TrainingBatchCursor.RamBuffer(vs, new double[n][0], null, 0, vs[0].length, 0);
+		Whitener w = Whitener.multivariateGaussianForInputs(c, 0.0001);
 	}
 }
