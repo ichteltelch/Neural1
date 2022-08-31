@@ -237,13 +237,18 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 			}
 			return truncated;
 		}
-		default RandomAccess remap(int[] outputMapping, int... inputMapping) {
-			return new RemappedCursor.RandomAccess(this, outputMapping, inputMapping);
+		default RandomAccess remap(double weightScale, int[] outputMapping, int... inputMapping) {
+			return new RemappedCursor.RandomAccess(this, weightScale, outputMapping, inputMapping);
 		}
-
+		default RandomAccess scaleWeights(double weightScale) {
+			return new RemappedCursor.RandomAccess(this, weightScale, null, null);
+		}
 	}
-	default TrainingBatchCursor remap(int[] outputMapping, int... inputMapping) {
-		return new RemappedCursor<TrainingBatchCursor>(this, outputMapping, inputMapping);
+	default TrainingBatchCursor remap(double weightScale, int[] outputMapping, int... inputMapping) {
+		return new RemappedCursor<TrainingBatchCursor>(this, weightScale, outputMapping, inputMapping);
+	}
+	default TrainingBatchCursor scaleWeights(double weightScale) {
+		return new RemappedCursor<TrainingBatchCursor>(this, weightScale, null, null);
 	}
 	
 	
@@ -760,18 +765,20 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 		final int ic;
 		final int oc;
 		final double[] buffer;
+		final double weightScale;
 		@SuppressWarnings("unchecked")
 		@Override
 		public RemappedCursor<B> clone() {
-			return new RemappedCursor<B>((B)((TrainingBatchCursor)original).clone(), outputMapping, inputMapping);
+			return new RemappedCursor<B>((B)((TrainingBatchCursor)original).clone(), weightScale, outputMapping, inputMapping);
 		}
-		public RemappedCursor(B back, int[] outputMapping, int...inputMapping) {
+		public RemappedCursor(B back, double weightScale, int[] outputMapping, int...inputMapping) {
 			original = back;
 			this.inputMapping = inputMapping;
 			ic = inputMapping==null?back.inputCount():inputMapping.length;
 			this.outputMapping = outputMapping;
 			oc = outputMapping==null?back.outputCount():outputMapping.length;
 			buffer = new double[Math.max(back.inputCount(), back.outputCount())];
+			this.weightScale=weightScale;
 		}
 		@Override public int inputCount() {return ic;}
 		@Override public int outputCount() {return oc;}
@@ -797,23 +804,52 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 				}
 			}			
 		}
-		@Override public double getWeight() {return original.getWeight();}
+		@Override public double getWeight() {return original.getWeight()*weightScale;}
 		@Override public void next() {original.next();}
 		@Override public boolean isFinished() {return original.isFinished();}
 		@Override public void reset() {original.reset();}
 		static class RandomAccess extends RemappedCursor<TrainingBatchCursor.RandomAccess> implements TrainingBatchCursor.RandomAccess{
 
-			public RandomAccess(TrainingBatchCursor.RandomAccess back, int[] outputMapping, int... inputMapping) {
-				super(back, outputMapping, inputMapping);
+			public RandomAccess(TrainingBatchCursor.RandomAccess back, double weightScale, int[] outputMapping, int... inputMapping) {
+				super(back, weightScale, outputMapping, inputMapping);
 			}
 
 			@Override public long size() {return original.size();}
 			@Override public void seek(long position) {original.seek(position);}
 			@Override public RemappedCursor.RandomAccess clone() {
-				return new RemappedCursor.RandomAccess(original, outputMapping, inputMapping);
+				return new RemappedCursor.RandomAccess(original, weightScale, outputMapping, inputMapping);
 			}
 			
 		}
+	}
+	public default double getTotalWeight() {
+		reset();
+		double ret = 0;
+		while(!isFinished()) {
+			ret += getWeight();
+			next();
+		}
+		return ret;
+	}
+	public default boolean containsNaN() {
+		reset();
+		double[] in = new double[inputCount()];
+		double[] out = new double[outputCount()];
+		while(!isFinished()) {
+			double w = getWeight();
+			if(Double.isNaN(w))
+				return true;
+			giveInputs(in);
+			giveOutputs(out);
+			for(double d: in)
+				if(Double.isNaN(d))
+					return true;
+			for(double d: out)
+				if(Double.isNaN(d))
+					return true;
+			next();
+		}
+		return false;
 	}
 	
 }
