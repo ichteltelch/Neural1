@@ -68,9 +68,9 @@ public class LSTM_BN implements InOutModule{
 			bnh=new LayerNorm(false);
 			bno=new LayerNorm();
 		}else if(useReNorm) {
-			bnx=new BatchReNorm(true);
-			bnh=new BatchReNorm(false);
-			bno=new BatchReNorm();
+			bnx=new BatchReNorm(true, false);
+			bnh=new BatchReNorm(false, false);
+			bno=new BatchReNorm(true, false);
 		}else {
 			bnx=new BatchNorm(true);
 			bnh=new BatchNorm(false);

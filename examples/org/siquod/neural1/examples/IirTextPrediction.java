@@ -116,11 +116,11 @@ public class IirTextPrediction {
 				new Copy(),
 				new StackModule().addFinalLayer(width, 
 						new Sparse(filling, false),  
-						new BatchReNorm(), new Nonlin(neuron)
+						new BatchReNorm(true, false), new Nonlin(neuron)
 						),
 				new StackModule().addFinalLayer(width, 
 						new Sparse(filling, false, -1, null),  
-						new BatchReNorm(), new Nonlin(neuron)
+						new BatchReNorm(true, false), new Nonlin(neuron)
 						)
 				);
 	}

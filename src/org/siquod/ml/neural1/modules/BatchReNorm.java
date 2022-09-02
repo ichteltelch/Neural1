@@ -29,6 +29,7 @@ public class BatchReNorm implements InOutScaleBiasModule{
 	ParamBlock add, mult, runningMean, runningSdev;
 	int age=0;
 	boolean hasAdd=true;
+	boolean broadcast;
 	int par=1;
 	TensorFormat tf;
 
@@ -41,11 +42,12 @@ public class BatchReNorm implements InOutScaleBiasModule{
 	static Function<Integer, Float> dmaxSchedule(int scal){
 		return n -> n < scal ? 0 : n <5*scal ?  5*(n-scal)/4f:5;
 	}
-	public BatchReNorm(boolean hasAdd) {
+	public BatchReNorm(boolean hasAdd, boolean broadcast) {
 		this.hasAdd=hasAdd;
+		this.broadcast=broadcast;
 	}
 	public BatchReNorm() {
-		this(true);
+		this(true, true);
 	}
 
 	@Override
@@ -54,12 +56,16 @@ public class BatchReNorm implements InOutScaleBiasModule{
 		out = ia.get("out");
 		if(!in.tf.equals(out.tf))
 			throw new IllegalArgumentException("input and output layer must be of the same size");
-		tf=in.tf;
-		while(tf.rank>2) {
-			tf = tf.flattenIndexAndNext(1);
-		}
-		if(tf.rank==1) {
-			tf = tf.insertUnitIndex(0);
+		if(broadcast) {
+			tf=in.tf;
+			while(tf.rank>2) {
+				tf = tf.flattenIndexAndNext(1);
+			}
+			if(tf.rank==1) {
+				tf = tf.insertUnitIndex(0);
+			}
+		}else{
+			tf = new TensorFormat(1, in.count);
 		}
 	}
 
@@ -480,9 +486,10 @@ public class BatchReNorm implements InOutScaleBiasModule{
 	private void gradientSlice(ParamSet params, ActivationBatch as, ActivationBatch errors, ParamSet gradients, int t,
 			float dmax, float rmax, int startI, int endI,
 			int startBri, int endBri) {
+		ActivationSet bp = as.batchParams.get(t);
 		for(int i=startI; i<endI; ++i) {
-			float mean = as.batchParams.get(t).get(this.mean, i);
-			float sdev = as.batchParams.get(t).get(this.sdev, i);
+			float mean = bp.get(this.mean, i);
+			float sdev = bp.get(this.sdev, i);
 			float scal = 1/sdev;
 			float rmean=params.get(runningMean, i);
 			float rsdev=params.get(runningSdev, i);
