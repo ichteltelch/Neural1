@@ -18,6 +18,7 @@ import org.siquod.ml.neural1.ParamAllocator;
 import org.siquod.ml.neural1.ParamBlock;
 import org.siquod.ml.neural1.ParamBlocks;
 import org.siquod.ml.neural1.ParamSet;
+import org.siquod.ml.neural1.TensorFormat;
 
 public class BatchReNorm implements InOutScaleBiasModule{
 
@@ -29,10 +30,11 @@ public class BatchReNorm implements InOutScaleBiasModule{
 	int age=0;
 	boolean hasAdd=true;
 	int par=1;
+	TensorFormat tf;
 
 	Function<Integer, Float> rmaxSchedule=rmaxSchedule(100);
 	Function<Integer, Float> dmaxSchedule=dmaxSchedule(100);
-	
+
 	static Function<Integer, Float> rmaxSchedule(int scal){
 		return n -> n < scal ? 1 : n <8*scal ?  1+2*(n-scal)/7f:3;
 	}	
@@ -50,32 +52,41 @@ public class BatchReNorm implements InOutScaleBiasModule{
 	public void allocate(InterfaceAllocator ia) {
 		in = ia.get("in");
 		out = ia.get("out");
-		if(in.count!=out.count)
+		if(!in.tf.equals(out.tf))
 			throw new IllegalArgumentException("input and output layer must be of the same size");
-
+		tf=in.tf;
+		while(tf.rank>2) {
+			tf = tf.flattenIndexAndNext(1);
+		}
+		if(tf.rank==1) {
+			tf = tf.insertUnitIndex(0);
+		}
 	}
 
 	@Override
 	public void allocateStatistics(InterfaceAllocator ia) {
 		ia.push(null);
-		mean = ia.allocate(new Interface("mean", in.tf));
-		sdev = ia.allocate(new Interface("sdev", in.tf));
+		int ch = tf.channels();
+		mean = ia.allocate(new Interface("mean", ch, null));
+		sdev = ia.allocate(new Interface("sdev", ch, null));
 		ia.pop();
 	}
 	@Override
 	public void allocate(ParamAllocator ia) {
-		if(hasAdd) add = ia.allocate(new ParamBlock("add", in.count));
-		mult = ia.allocate(new ParamBlock("mult", in.count));
-		runningMean = ia.allocate(new ParamBlock("mean", in.count));
-		runningSdev = ia.allocate(new ParamBlock("sdev", in.count));
+		int ch = tf.channels();
+		if(hasAdd) add = ia.allocate(new ParamBlock("add", ch));
+		mult = ia.allocate(new ParamBlock("mult", ch));
+		runningMean = ia.allocate(new ParamBlock("mean", ch));
+		runningSdev = ia.allocate(new ParamBlock("sdev", ch));
 	}
 
 	@Override
 	public void share(ParamBlocks ps) {
-		if(hasAdd) add = ps.get("add", in.count);
-		mult = ps.get("mult", in.count);		
-		runningMean = ps.get("mean", in.count);
-		runningSdev = ps.get("sdev", in.count);		
+		int ch = tf.channels();
+		if(hasAdd) add = ps.get("add", ch);
+		mult = ps.get("mult", ch);		
+		runningMean = ps.get("mean", ch);
+		runningSdev = ps.get("sdev", ch);		
 	}
 
 	@Override
@@ -92,16 +103,19 @@ public class BatchReNorm implements InOutScaleBiasModule{
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst) {
 		ActivationSet bparm = as.batchParams.get(t);
 		if(inst==null) {
+			int ch = tf.channels();
 			if(training != ForwardPhase.TESTING) {
 
 				float dmax=dmaxSchedule.apply(age);
 				float rmax=rmaxSchedule.apply(age);
-				
-				int taskCount = Math.min(par*4, in.count);
+
+				int taskCount = Math.min(par*4, ch);
 				if(par==1 || taskCount==1) {
 					int startI = 0;
-					int endI = in.count;
-					forwardSlice(params, as, t, bparm, startI, endI, dmax, rmax);
+					int endI = ch;
+					int startBri = 0;
+					int endBri = tf.dims[0];
+					forwardSlice(params, as, t, bparm, startI, endI, startBri, endBri, dmax, rmax);
 				}else {
 					AtomicInteger done = new AtomicInteger();
 					int neededWorkers = Math.min(par, taskCount);
@@ -113,9 +127,11 @@ public class BatchReNorm implements InOutScaleBiasModule{
 									int task = done.getAndAdd(1);
 									if(task>=taskCount)
 										return;
-									int startI = task * in.count / taskCount;
-									int endI = (task+1) * in.count / taskCount;
-									forwardSlice(params, as, t, bparm, startI, endI, dmax, rmax);
+									int startI = task * ch / taskCount;
+									int endI = (task+1) * ch / taskCount;
+									int startBri = 0;
+									int endBri = tf.dims[0];
+									forwardSlice(params, as, t, bparm, startI, endI, startBri, endBri, dmax, rmax);
 								}
 							}));
 						}
@@ -128,16 +144,18 @@ public class BatchReNorm implements InOutScaleBiasModule{
 
 				}
 			}else {
-				int maxPar = Math.max(in.count, as.length);
-				
+				int maxPar = Math.max(ch, as.length);
+
 				int taskCount = Math.min(par*4, maxPar);
 				if(par==1 || taskCount==1) {
 					int startI = 0;
-					int endI = in.count;
+					int endI = ch;
 					int startA = 0;
 					int endA = as.length;
+					int startBri = 0;
+					int endBri = tf.dims[0];
 
-					forwardInferenceSlice(params, as, t, startI, endI, startA, endA);
+					forwardInferenceSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
 				}else{
 					AtomicInteger done = new AtomicInteger();
 					int workersNeeded = Math.min(par, maxPar);
@@ -153,8 +171,10 @@ public class BatchReNorm implements InOutScaleBiasModule{
 										int startA = task * as.length / taskCount;
 										int endA = (task+1) * as.length / taskCount;
 										int startI = 0;
-										int endI = in.count;
-										forwardInferenceSlice(params, as, t, startI, endI, startA, endA);
+										int endI = ch;
+										int startBri = 0;
+										int endBri = tf.dims[0];
+										forwardInferenceSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
 									}
 								}));
 							}
@@ -165,11 +185,13 @@ public class BatchReNorm implements InOutScaleBiasModule{
 										int task = done.getAndAdd(1);
 										if(task>=taskCount)
 											return;
-										int startI = task * in.count / taskCount;
-										int endI = (task+1) * in.count / taskCount;
+										int startI = task * ch / taskCount;
+										int endI = (task+1) * ch / taskCount;
 										int startA = 0;
 										int endA = as.length;
-										forwardInferenceSlice(params, as, t, startI, endI, startA, endA);
+										int startBri = 0;
+										int endBri = tf.dims[0];
+										forwardInferenceSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
 									}
 								}));
 							}
@@ -183,7 +205,7 @@ public class BatchReNorm implements InOutScaleBiasModule{
 
 				}
 
-				
+
 			}
 		}else {
 			//TODO
@@ -191,8 +213,8 @@ public class BatchReNorm implements InOutScaleBiasModule{
 		}
 
 	}
-	private void forwardInferenceSlice(ParamSet params, ActivationBatch as, int t, int startI, int endI, int startA,
-			int endA) {
+	private void forwardInferenceSlice(ParamSet params, ActivationBatch as, int t, 
+			int startI, int endI, int startA, int endA, int startBri, int endBri) {
 		for(int bi = startA; bi<endA; ++bi) {
 			ActivationSeq b = as.a[bi];
 			if(b==null)
@@ -203,38 +225,47 @@ public class BatchReNorm implements InOutScaleBiasModule{
 				float sdev = params.get(this.runningSdev, i);
 				float addVal=hasAdd?params.get(add, i):0;
 				float multVal=params.get(mult, i);
-//						if(i==0) {
-//							System.out.println("mean = "+mean+", var = "+var);
-//							System.out.println("add = "+addVal+", mult = "+multVal);
-//						}
+				//						if(i==0) {
+				//							System.out.println("mean = "+mean+", var = "+var);
+				//							System.out.println("add = "+addVal+", mult = "+multVal);
+				//						}
 				//						System.out.println(" (x + "+mShift+") * "+vScale+" * "+multVal+" + "+addVal);
 
 				float scal = 1/sdev;
-
-				float d = (a.get(in, i) - mean)*scal;
-				float v = d*multVal + addVal;
-				a.add(out, i, v);
+				for(int bri = startBri; bri<endBri; bri++) {
+					int index = tf.index(bri, i);
+					float d = (a.get(in, index) - mean)*scal;
+					float v = d*multVal + addVal;
+					a.add(out, index, v);
+				}
 			}
 		}
 	}
 	private void forwardSlice(ParamSet params, ActivationBatch as, int t, ActivationSet bparm, int startI, int endI,
-			float dmax, float rmax) {
+			int startBri, int endBri, float dmax, float rmax) {
 		for(int i=startI; i<endI; ++i) {
 			float mean=0;
 			int count=0;
 			for(ActivationSeq b: as) {
 				if(b==null)
 					continue;
-				mean+=b.get(t).get(in, i);
-				count++;
+				for(int bri = startBri; bri<endBri; ++bri) {
+					int index = tf.index(bri, i);
+					mean+=b.get(t).get(in, index);
+					count++;
+				}
 			}
 			mean/=count;
 			float var = 0;
 			for(ActivationSeq b: as) {
 				if(b==null)
 					continue;
-				float d = b.get(t).get(in, i) - mean;
-				var += d*d;
+				for(int bri = startBri; bri<endBri; ++bri) {
+					int index = tf.index(bri, i);
+
+					float d = b.get(t).get(in, index) - mean;
+					var += d*d;
+				}
 			}
 			var/=count;
 			float sdev=(float) Math.sqrt(var+epsilon);
@@ -251,34 +282,40 @@ public class BatchReNorm implements InOutScaleBiasModule{
 
 			float addVal=hasAdd?params.get(add, i):0;
 			float multVal=params.get(mult, i);
-//					if(i==0) {
-//						System.out.println("mean = "+mean+", var = "+var);
-//						System.out.println("add = "+addVal+", mult = "+multVal);
-//					}
+			//					if(i==0) {
+			//						System.out.println("mean = "+mean+", var = "+var);
+			//						System.out.println("add = "+addVal+", mult = "+multVal);
+			//					}
 			//					System.out.println(" (x - "+mean+") * "+scal+" * "+multVal+" + "+addVal);
 			for(ActivationSeq b: as) {
 				if(b==null)
 					continue;
 				ActivationSet a = b.get(t);
-				float dv = (a.get(in, i) - mean)*scal*r+d;
-				float v = dv*multVal + addVal;
-				a.add(out, i, v);
+				for(int bri = startBri; bri<endBri; ++bri) {
+					int index = tf.index(bri, i);
+					float dv = (a.get(in, index) - mean)*scal*r+d;
+					float v = dv*multVal + addVal;
+					a.add(out, index, v);
+				}
 			}
 		}
 	}
 
 	@Override
 	public void backprop(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, int t, int[] inst) {
-//		float dmax=dmaxSchedule.apply(age);
+		//		float dmax=dmaxSchedule.apply(age);
 		float rmax=rmaxSchedule.apply(age);
-		
-		if(inst==null) {
-			
-			int taskCount = Math.min(par*4, in.count);
+
+		if(inst==null) {			
+			int ch = tf.channels();
+			int taskCount = Math.min(par*4, ch);
 			if(par==1 || taskCount==1) {
 				int startI = 0;
-				int endI = in.count;
-				backpropSlice(params, as, errors, t, rmax, startI, endI);
+				int endI = ch;
+				int startBri = 0;
+				int endBri = tf.dims[0];
+
+				backpropSlice(params, as, errors, t, rmax, startI, endI, startBri, endBri);
 			}else {
 				AtomicInteger done = new AtomicInteger();
 				int workersNeeded = Math.min(par, taskCount);
@@ -290,9 +327,12 @@ public class BatchReNorm implements InOutScaleBiasModule{
 								int task = done.getAndAdd(1);
 								if(task>=taskCount)
 									return;
-								int startI = task * in.count / taskCount;
-								int endI = (task+1) * in.count / taskCount;
-								backpropSlice(params, as, errors, t, rmax, startI, endI);
+								int startI = task * ch / taskCount;
+								int endI = (task+1) * ch / taskCount;
+								int startBri = 0;
+								int endBri = tf.dims[0];
+
+								backpropSlice(params, as, errors, t, rmax, startI, endI, startBri, endBri);
 							}
 						}));
 					}
@@ -311,17 +351,18 @@ public class BatchReNorm implements InOutScaleBiasModule{
 		}
 	}
 	private void backpropSlice(ParamSet params, ActivationBatch as, ActivationBatch errors, int t, float rmax,
-			int startI, int endI) {
+			int startI, int endI,
+			int startBri, int endBri) {
 		for(int i=startI; i<endI; ++i) {
 
 			float mean = as.batchParams.get(t).get(this.mean, i);
 			float sdev = as.batchParams.get(t).get(this.sdev, i);
 			float scal = 1/sdev;
-//				float rmean=params.get(runningMean, i);
+			//				float rmean=params.get(runningMean, i);
 			float rsdev=params.get(runningSdev, i);
 
 			float r=Math.min(rmax, Math.max(1/rmax, sdev/rsdev));
-//				float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
+			//				float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
 
 			//				float addVal=params.get(add, i);
 			float multVal=params.get(mult, i);
@@ -332,12 +373,16 @@ public class BatchReNorm implements InOutScaleBiasModule{
 				ActivationSeq es=errors.a[b];
 				if(es==null)
 					continue;
-				count++;
-				ActivationSet a = as.a[b].get(t);
-				ActivationSet e = es.get(t);
-				float me=e.get(out, i)*multVal;
-				float scalInp = (a.get(in, i)-mean);
-				scalErr+=me*scalInp;
+				for(int bri = startBri; bri<endBri; ++bri) {
+					int index = tf.index(bri, i);
+
+					count++;
+					ActivationSet a = as.a[b].get(t);
+					ActivationSet e = es.get(t);
+					float me=e.get(out, index)*multVal;
+					float scalInp = (a.get(in, index)-mean);
+					scalErr+=me*scalInp;
+				}
 
 
 			}
@@ -352,11 +397,15 @@ public class BatchReNorm implements InOutScaleBiasModule{
 					continue;
 				ActivationSet a = as.a[b].get(t);
 				ActivationSet e = es.get(t);
-				float scalInp = a.get(in, i)-mean;
-				float me=e.get(out, i)*multVal*r;
-				me *= scal;
-				me += 2 * scalInp * varErr;
-				meanErr += -me;
+				for(int bri = startBri; bri<endBri; ++bri) {
+					int index = tf.index(bri, i);
+
+					float scalInp = a.get(in, index)-mean;
+					float me=e.get(out, index)*multVal*r;
+					me *= scal;
+					me += 2 * scalInp * varErr;
+					meanErr += -me;
+				}
 			}
 			meanErr/=count;
 			for(int b=0; b<as.length; ++b) {
@@ -365,12 +414,16 @@ public class BatchReNorm implements InOutScaleBiasModule{
 					continue;
 				ActivationSet a = as.a[b].get(t);
 				ActivationSet e = es.get(t);
-				float scalInp = a.get(in, i)-mean;
-				float me=e.get(out, i)*multVal*r;
-				me *= scal;
-				me += 2 * scalInp * varErr;
-				me += meanErr;
-				e.add(in, i, me);
+				for(int bri = startBri; bri<endBri; ++bri) {
+					int index = tf.index(bri, i);
+
+					float scalInp = a.get(in, index)-mean;
+					float me=e.get(out, index)*multVal*r;
+					me *= scal;
+					me += 2 * scalInp * varErr;
+					me += meanErr;
+					e.add(in, index, me);
+				}
 			}
 		}
 	}
@@ -381,11 +434,15 @@ public class BatchReNorm implements InOutScaleBiasModule{
 		float dmax=dmaxSchedule.apply(age);
 		float rmax=rmaxSchedule.apply(age);
 		if(inst==null) {
-			int taskCount = Math.min(par*4, in.count);
+			int ch = tf.channels();
+			int taskCount = Math.min(par*4, ch);
 			if(par==1 || taskCount==1) {
 				int startI = 0;
-				int endI = in.count;
-				gradientSlice(params, as, errors, gradients, t, dmax, rmax, startI, endI);
+				int endI = ch;
+				int startBri = 0;
+				int endBri = tf.dims[0];
+
+				gradientSlice(params, as, errors, gradients, t, dmax, rmax, startI, endI, startBri, endBri);
 			}else {
 				AtomicInteger done = new AtomicInteger();
 				int workersNeeded = Math.min(par, taskCount);
@@ -397,9 +454,12 @@ public class BatchReNorm implements InOutScaleBiasModule{
 								int task = done.getAndAdd(1);
 								if(task>=taskCount)
 									return;
-								int startI = task * in.count / taskCount;
-								int endI = (task+1) * in.count / taskCount;
-								gradientSlice(params, as, errors, gradients, t, dmax, rmax, startI, endI);
+								int startI = task * ch / taskCount;
+								int endI = (task+1) * ch / taskCount;
+								int startBri = 0;
+								int endBri = tf.dims[0];
+
+								gradientSlice(params, as, errors, gradients, t, dmax, rmax, startI, endI, startBri, endBri);
 							}
 						}));
 					}
@@ -418,7 +478,8 @@ public class BatchReNorm implements InOutScaleBiasModule{
 		}	
 	}
 	private void gradientSlice(ParamSet params, ActivationBatch as, ActivationBatch errors, ParamSet gradients, int t,
-			float dmax, float rmax, int startI, int endI) {
+			float dmax, float rmax, int startI, int endI,
+			int startBri, int endBri) {
 		for(int i=startI; i<endI; ++i) {
 			float mean = as.batchParams.get(t).get(this.mean, i);
 			float sdev = as.batchParams.get(t).get(this.sdev, i);
@@ -440,18 +501,22 @@ public class BatchReNorm implements InOutScaleBiasModule{
 				//					count++;
 				ActivationSet a = as.a[b].get(t);
 				ActivationSet e = es.get(t);
-				float oe=e.get(out, i);
-				addErr += oe;
-				float reparin = (a.get(in, i)-mean)*scal*r+d;
-				multErr += reparin * oe;
+				for(int bri = startBri; bri<endBri; ++bri) {
+					int index = tf.index(bri, i);
+
+					float oe=e.get(out, index);
+					addErr += oe;
+					float reparin = (a.get(in, index)-mean)*scal*r+d;
+					multErr += reparin * oe;
+				}
 
 
 			}
 			if(hasAdd)
 				gradients.add(add, i, addErr);
 			gradients.add(mult, i, multErr);
-//				gradients.set(runningMean, i, 0);
-//				gradients.add(runningVar, i, 0);
+			//				gradients.set(runningMean, i, 0);
+			//				gradients.add(runningVar, i, 0);
 		}
 	}
 	@Override
@@ -461,7 +526,8 @@ public class BatchReNorm implements InOutScaleBiasModule{
 	@Override
 	public void initParams(ParamSet p) {
 		age=0;
-		for(int i=0; i<in.count; ++i) {
+		int ch = tf.channels();
+		for(int i=0; i<ch; ++i) {
 			if(hasAdd)
 				p.set(add, i, 0);
 			p.set(mult, i, 1);
@@ -498,7 +564,8 @@ public class BatchReNorm implements InOutScaleBiasModule{
 	public void updateStatistics(ActivationSeq stat, ParamSet params, Function<Integer, Float> owt_fun, float[] weight, int tMin) {
 		float owt=owt_fun.apply(age++);
 		System.out.print("");
-		for(int i=0; i<in.count; ++i) {
+		int ch = tf.channels();
+		for(int i=0; i<ch; ++i) {
 			float smean, ssdev, swt;
 			smean=params.get(runningMean, i)*owt;
 			ssdev=params.get(runningSdev, i)*owt;
