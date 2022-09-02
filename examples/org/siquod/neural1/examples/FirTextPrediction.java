@@ -9,24 +9,24 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 
-import org.siquod.neural1.TensorFormat;
-import org.siquod.neural1.modules.BatchNorm;
-import org.siquod.neural1.modules.Conv1D;
-import org.siquod.neural1.modules.Copy;
-import org.siquod.neural1.modules.Dense;
-import org.siquod.neural1.modules.Dropout;
-import org.siquod.neural1.modules.InOutModule;
-import org.siquod.neural1.modules.LogSoftmax;
-import org.siquod.neural1.modules.MaxPooling1D;
-import org.siquod.neural1.modules.Maxout;
-import org.siquod.neural1.modules.Nonlin;
-import org.siquod.neural1.modules.StackModule;
-import org.siquod.neural1.modules.loss.NllLoss;
-import org.siquod.neural1.modules.regularizer.L2Reg;
-import org.siquod.neural1.modules.regularizer.Regularizer;
-import org.siquod.neural1.net.FeedForward;
-import org.siquod.neural1.neurons.Isrlu;
-import org.siquod.neural1.neurons.Neuron;
+import org.siquod.ml.neural1.TensorFormat;
+import org.siquod.ml.neural1.modules.BatchNorm;
+import org.siquod.ml.neural1.modules.Conv1D;
+import org.siquod.ml.neural1.modules.Copy;
+import org.siquod.ml.neural1.modules.Dense;
+import org.siquod.ml.neural1.modules.Dropout;
+import org.siquod.ml.neural1.modules.InOutModule;
+import org.siquod.ml.neural1.modules.LogSoftmax;
+import org.siquod.ml.neural1.modules.MaxPooling1D;
+import org.siquod.ml.neural1.modules.Maxout;
+import org.siquod.ml.neural1.modules.Nonlin;
+import org.siquod.ml.neural1.modules.StackModule;
+import org.siquod.ml.neural1.modules.loss.NllLoss;
+import org.siquod.ml.neural1.modules.regularizer.L2Reg;
+import org.siquod.ml.neural1.modules.regularizer.Regularizer;
+import org.siquod.ml.neural1.net.FeedForward;
+import org.siquod.ml.neural1.neurons.Isrlu;
+import org.siquod.ml.neural1.neurons.Neuron;
 
 public class FirTextPrediction {
 	

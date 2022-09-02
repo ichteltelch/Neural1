@@ -10,19 +10,19 @@ import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 
-import org.siquod.neural1.modules.BatchReNorm;
-import org.siquod.neural1.modules.Dense;
-import org.siquod.neural1.modules.Dropout;
-import org.siquod.neural1.modules.InOutModule;
-import org.siquod.neural1.modules.Nonlin;
-import org.siquod.neural1.modules.StackModule;
-import org.siquod.neural1.modules.loss.SoftMaxNllLoss;
-import org.siquod.neural1.modules.regularizer.L2Reg;
-import org.siquod.neural1.modules.regularizer.Regularizer;
-import org.siquod.neural1.net.FeedForward;
-import org.siquod.neural1.neurons.Isrlu;
-import org.siquod.neural1.neurons.Neuron;
-import org.siquod.neural1.updaters.*;
+import org.siquod.ml.neural1.modules.BatchReNorm;
+import org.siquod.ml.neural1.modules.Dense;
+import org.siquod.ml.neural1.modules.Dropout;
+import org.siquod.ml.neural1.modules.InOutModule;
+import org.siquod.ml.neural1.modules.Nonlin;
+import org.siquod.ml.neural1.modules.StackModule;
+import org.siquod.ml.neural1.modules.loss.SoftMaxNllLoss;
+import org.siquod.ml.neural1.modules.regularizer.L2Reg;
+import org.siquod.ml.neural1.modules.regularizer.Regularizer;
+import org.siquod.ml.neural1.net.FeedForward;
+import org.siquod.ml.neural1.neurons.Isrlu;
+import org.siquod.ml.neural1.neurons.Neuron;
+import org.siquod.ml.neural1.optimizers.*;
 
 
 public class ClassifyTest {

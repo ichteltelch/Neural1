@@ -10,27 +10,27 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Random;
 
-import org.siquod.neural1.modules.BatchReNorm;
-import org.siquod.neural1.modules.Copy;
-import org.siquod.neural1.modules.Dense;
-import org.siquod.neural1.modules.Dropout;
-import org.siquod.neural1.modules.InOutModule;
-import org.siquod.neural1.modules.LSTM_BN;
-import org.siquod.neural1.modules.LayerNorm;
-import org.siquod.neural1.modules.LogSoftmax;
-import org.siquod.neural1.modules.Nonlin;
-import org.siquod.neural1.modules.Para;
-import org.siquod.neural1.modules.Sparse;
-import org.siquod.neural1.modules.StackModule;
-import org.siquod.neural1.modules.loss.NllLoss;
-import org.siquod.neural1.modules.regularizer.L1Reg;
-import org.siquod.neural1.modules.regularizer.Regularizer;
-import org.siquod.neural1.net.Recurrent;
-import org.siquod.neural1.net.Recurrent.Eval;
-import org.siquod.neural1.net.Recurrent.NaiveTrainer;
-import org.siquod.neural1.neurons.Neuron;
-import org.siquod.neural1.neurons.SeLU;
-import org.siquod.neural1.updaters.AmsGrad;
+import org.siquod.ml.neural1.modules.BatchReNorm;
+import org.siquod.ml.neural1.modules.Copy;
+import org.siquod.ml.neural1.modules.Dense;
+import org.siquod.ml.neural1.modules.Dropout;
+import org.siquod.ml.neural1.modules.InOutModule;
+import org.siquod.ml.neural1.modules.LSTM_BN;
+import org.siquod.ml.neural1.modules.LayerNorm;
+import org.siquod.ml.neural1.modules.LogSoftmax;
+import org.siquod.ml.neural1.modules.Nonlin;
+import org.siquod.ml.neural1.modules.Para;
+import org.siquod.ml.neural1.modules.Sparse;
+import org.siquod.ml.neural1.modules.StackModule;
+import org.siquod.ml.neural1.modules.loss.NllLoss;
+import org.siquod.ml.neural1.modules.regularizer.L1Reg;
+import org.siquod.ml.neural1.modules.regularizer.Regularizer;
+import org.siquod.ml.neural1.net.Recurrent;
+import org.siquod.ml.neural1.net.Recurrent.Eval;
+import org.siquod.ml.neural1.net.Recurrent.NaiveTrainer;
+import org.siquod.ml.neural1.neurons.Neuron;
+import org.siquod.ml.neural1.neurons.SeLU;
+import org.siquod.ml.neural1.optimizers.AmsGrad;
 
 public class IirTextPrediction {
 	/**
