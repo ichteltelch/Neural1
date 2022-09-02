@@ -21,11 +21,15 @@ import org.siquod.ml.neural1.modules.LogSoftmax;
  */
 public class SoftMaxNllLoss extends LossLayer{
 	public static final String hiddenName="LogSoftMax output";
-	LogSoftmax sm=new LogSoftmax();
+	LogSoftmax sm;
 	NllLoss loss;
 	Interface hidden;
 	public SoftMaxNllLoss(String... ph){
-		loss=new NllLoss(ph);
+		this(null, ph);
+	}
+	public SoftMaxNllLoss(LossGroup[] lgs, String... ph){
+		sm=new LogSoftmax(lgs);
+		loss=new NllLoss(lgs, ph);
 	}
 	@Override
 	public void allocate(InterfaceAllocator ia) {

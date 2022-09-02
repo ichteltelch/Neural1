@@ -14,9 +14,12 @@ import org.siquod.ml.neural1.ParamAllocator;
 import org.siquod.ml.neural1.ParamBlocks;
 import org.siquod.ml.neural1.ParamSet;
 import org.siquod.ml.neural1.TensorFormat;
+import org.siquod.ml.neural1.modules.loss.LossGroup;
 
 /**
  * This layer computes the logarithmized softmax function of its input vector
+ * 
+ * You can divide the vector into several {@link LossGroup}s which will be treated separately
  * @author bb
  *
  */
@@ -25,6 +28,15 @@ public class LogSoftmax implements InOutModule{
 
 	TensorFormat tf;
 
+	LossGroup[] lgs;
+
+	public LogSoftmax(LossGroup... lgs) {
+		this.lgs=lgs;
+	}
+
+	public LogSoftmax() {
+
+	}
 
 	@Override
 	public void allocate(InterfaceAllocator ia) {
@@ -38,6 +50,17 @@ public class LogSoftmax implements InOutModule{
 		}
 		if(tf.rank==1) {
 			tf = tf.insertUnitIndex(0);
+		}
+		int channels = tf.channels();
+		if(lgs==null)
+			lgs=LossGroup.makeDefault(channels);
+		else {
+			int lgl = lgs[lgs.length-1].end;
+			if(lgl > channels) {
+				throw new IllegalStateException("There are not enough channels for the specified LossGroups");
+			}else if(lgl < channels) {
+				System.err.println("Warning: There are more channels than specified by the LossGroups");
+			}
 		}
 	}
 
@@ -63,32 +86,45 @@ public class LogSoftmax implements InOutModule{
 			throw new IllegalThreadStateException("A "+getClass().getName()+" module must not be inside a convolution");
 
 		int n0 = tf.dims[0];
-		int n1 = tf.dims[1];
 		for(ActivationSeq b: as) {
 			if(b==null) continue;
 
 			ActivationSet a = b.get(t);
-			for(int i0 = 0; i0<n0; ++i0) {
-				double sum = 0;
-				float max=Float.NEGATIVE_INFINITY;
+			for(int bri = 0; bri<n0; ++bri) {
+				for(LossGroup lg: lgs) {
+					int iStart = lg.start;
+					int iEnd = lg.end;
+					boolean singleton = lg.isSingleton();
+					double sum;
+					float max;
 
-				for(int i=0; i<n1; ++i){
-					float av = a.get(in, tf.index(i0, i));
-					if(av>max)
-						max=av;
-				}
-				for(int i=0; i<n1; ++i){
-					double av = a.get(in, tf.index(i0, i));			
-					sum += Math.exp(av-max);
-				}
-				float logSum = (float) Math.log(sum);
-				for(int i=0; i<n1; ++i){
-					//				if(a.get(out, tf.index(i0, i))!=0)
-					//					System.out.println();
-					//			check2+=Math.exp(a.get(in, i) - logSum);
-					float o = a.get(in, tf.index(i0, i)) - max - logSum;
-					a.add(out, tf.index(i0, i), o);
-					//			check+=Math.exp(a.get(out, i));
+					if(singleton) {
+						max = 0;
+						sum = 1;
+					}else {
+						max=Float.NEGATIVE_INFINITY;
+						for(int i=iStart; i<iEnd; ++i){
+							float av = a.get(in, tf.index(bri, i));
+							if(av>max)
+								max=av;
+						}
+						sum = 0;
+					}
+
+					for(int i=iStart; i<iEnd; ++i){
+						double av = a.get(in, tf.index(bri, i));			
+						sum += Math.exp(av-max);
+					}
+					float logSum = (float) Math.log(sum);
+					for(int i=iStart; i<iEnd; ++i){
+						//				if(a.get(out, tf.index(i0, i))!=0)
+						//					System.out.println();
+						//			check2+=Math.exp(a.get(in, i) - logSum);
+						int index = tf.index(bri, i);
+						float o = a.get(in, index) - max - logSum;
+						a.add(out, index, o);
+						//			check+=Math.exp(a.get(out, i));
+					}
 				}
 			}
 			//		System.out.println("check: "+check+" "+check2);
@@ -103,40 +139,57 @@ public class LogSoftmax implements InOutModule{
 		//    = sum_k (d L / d out_k)*(d (kronnecker_ik - (max==in_i?1:0) - (max==in_i?0:1)*(exp(in_i - max))/(sum_j exp(in_j - max))))
 		//    = (d L / d out_i) sum_k (d L / d out_k)*(-(max==in_i?1:0)- (max==in_i?0:1)*exp(in_i - max))/(sum_j exp(in_j - max))))
 		int n0 = tf.dims[0];
-		int n1 = tf.dims[1];
 		for(int b=0; b<as.length; ++b) {
 			if(errors.a[b]==null) continue;
 
 			ActivationSet a = as.a[b].get(t);
 			ActivationSet e = errors.a[b].get(t);
-			for(int i0 = 0; i0<n0; ++i0) {
-				float odSum=0;
-				float sum = 0;
-				double max=Double.NEGATIVE_INFINITY;
-				int maxi=-1;
-				for(int i=0; i<n1; ++i){
-					double av = a.get(in, tf.index(i0, i));
-					if(av>max){
-						max=av;
-						maxi=i;
-					}
-				}
-				for(int i=0; i<n1; ++i){
-					odSum+=e.get(out, i);
-					sum += Math.exp(a.get(in, tf.index(i0, i)) - max);		
-				}
-				for(int i=0; i<n1; i++){
-					if(false && i==maxi){
-						e.add(in, i, e.get(out, tf.index(i0, i)) - odSum );
-					}else{
-						e.add(in, i, e.get(out, tf.index(i0, i)) - odSum * (float)Math.exp(a.get(in, tf.index(i0, i)) - max)/sum );
+			for(int bri = 0; bri<n0; ++bri) {
+				for(LossGroup lg: lgs) {
+					int iStart = lg.start;
+					int iEnd = lg.end;
+					boolean singleton = lg.isSingleton();
+
+					if(singleton) {
+						int i = iStart;
+						int index = tf.index(bri, i);
+						float od=e.get(out, index);
+						float ei = (float)Math.exp(a.get(in, index));
+						float sum =  1 + ei;
+						e.add(in, index, od*(1 - ei/sum));
+
+					}else {
+						float odSum=0;
+						float sum = 0;
+						double max=Double.NEGATIVE_INFINITY;
+						int maxi=-1;
+						for(int i=iStart; i<iEnd; ++i){
+							double av = a.get(in, tf.index(bri, i));
+							if(av>max){
+								max=av;
+								maxi=i;
+							}
+						}
+						for(int i=iStart; i<iEnd; ++i){
+							int index = tf.index(bri, i);
+							odSum+=e.get(out, index);
+							sum += Math.exp(a.get(in, index) - max);		
+						}
+						for(int i=iStart; i<iEnd; i++){
+							int index = tf.index(bri, i);
+							if(false && i==maxi){
+								e.add(in, index, e.get(out, index) - odSum );
+							}else{
+								e.add(in, index, e.get(out, index) - odSum * (float)Math.exp(a.get(in, index) - max)/sum );
+							}
+						}
+
 					}
 				}
 			}
 		}
+
 	}
-
-
 
 	////	@Override
 	//	public void declareDependencies(Dependencies d) {
