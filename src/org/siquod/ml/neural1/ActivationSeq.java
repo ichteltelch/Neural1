@@ -61,7 +61,6 @@ public class ActivationSeq implements Cloneable{
 	public void sampleDropout(int dropoutOffset, int dropoutCount, double keepProb, Random rand){
 		for(int j=0; j<dropoutCount; ++j){
 			dropoutMasks[dropoutOffset+j] = rand.nextDouble()<keepProb?1:0;
-//			dropoutMasks[dropoutOffset+j] = Math.random()<keepProb?1:0;
 		}
 	}
 	public void sampleDropout(int dropoutOffset, int dropoutCount, double keepProb){

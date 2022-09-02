@@ -61,9 +61,9 @@ public class IirTextPrediction {
 	 * Netzwerkstruktur
 	 */
 	InOutModule mod = new StackModule()
-			.addLayer(width, lstm(width, 1)).addLayer(Dropout.factory(0.9))
-			.addLayer(width, lstm(width, 1)).addLayer(Dropout.factory(0.9))
-			.addLayer(width, lstm(width, 1)).addLayer(Dropout.factory(0.9))
+			.addLayer(width, lstm(width, 1)).addLayer(Dropout.factory(0.9, false))
+			.addLayer(width, lstm(width, 1)).addLayer(Dropout.factory(0.9, false))
+			.addLayer(width, lstm(width, 1)).addLayer(Dropout.factory(0.9, false))
 			.addLayer(alphabet.length(), output=new Dense().regularizer(reg))
 			.addFinalLayer(new LogSoftmax())
 			;

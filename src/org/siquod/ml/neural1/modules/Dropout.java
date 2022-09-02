@@ -14,28 +14,49 @@ import org.siquod.ml.neural1.Module;
 import org.siquod.ml.neural1.ParamAllocator;
 import org.siquod.ml.neural1.ParamBlocks;
 import org.siquod.ml.neural1.ParamSet;
+import org.siquod.ml.neural1.TensorFormat;
 
 public class Dropout extends InOutCastLayer{
 	public float keepProbability;
-	public int dropoutOffset=-1;
+	public int dropoutOffset=-1;	
+	TensorFormat tf;
+
+
 	Random r;
-	public Dropout(Interface in2, double p, Random r) {
+	public Dropout(Interface in2, double p, Random r, boolean perChannel) {
 		super(in2);
 		keepProbability=(float) p;
 		out=new Interface(in.count, in.tf);
 		out.offset=in.offset;
 		this.r=new Random(r.nextLong());
+		if(perChannel) {
+			tf=in.tf;
+			while(tf.rank>2) {
+				tf = tf.flattenIndexAndNext(1);
+			}
+			if(tf.rank==1) {
+				tf = tf.insertUnitIndex(0);
+			}
+		}else{
+			tf = new TensorFormat(1, in.count);
+		}
 
 	}
 	public static InOutCastFactory factory(final double keepProb){
-		return factory(keepProb, new Random());
-	}
+		return factory(keepProb, new Random(), true);
+	}		
 	public static InOutCastFactory factory(final double keepProb, Random rand){
+		return factory(keepProb, rand, true);
+	}
+	public static InOutCastFactory factory(final double keepProb, boolean perChannel){
+		return factory(keepProb, new Random(), perChannel);
+	}
+	public static InOutCastFactory factory(final double keepProb, Random rand, boolean perChannel){
 		Random r=new Random(rand.nextLong());
 		return new InOutCastFactory() {
 			@Override
 			public InOutCastLayer produce(Interface in) {
-				return new Dropout(in, keepProb, r);
+				return new Dropout(in, keepProb, r, perChannel);
 			}
 		};
 	}
@@ -43,7 +64,7 @@ public class Dropout extends InOutCastLayer{
 	public void allocate(InterfaceAllocator ia) {
 		super.allocate(ia);
 		if(dropoutOffset==-1)
-			dropoutOffset=ia.allocateDropout(in.count);
+			dropoutOffset=ia.allocateDropout(tf.channels());
 		if(out.tf==null)
 			out.tf=in.tf;
 
@@ -66,8 +87,18 @@ public class Dropout extends InOutCastLayer{
 			for(ActivationSeq ab: as) {
 				if(ab==null) continue;
 				ActivationSet a=ab.get(t);
-				for(int i=0; i<in.count; ++i){
-					a.mult(in, i, ab.getDropout(dropoutOffset + i));
+
+				int n0 = tf.dims[0];
+				for(int i=0; i<tf.channels(); ++i){
+					int dro = ab.getDropout(dropoutOffset + i);
+					if(dro==0) {
+						for(int bri=0; bri<n0; ++bri) {
+							a.set(in, tf.index(bri, i), 0);
+						}
+					}
+					//					for(int bri=0; bri<n0; ++bri) {
+					//						a.mult(in, tf.index(bri, i), dro);
+					//					}
 				}		
 
 			}
@@ -87,8 +118,17 @@ public class Dropout extends InOutCastLayer{
 			if(errors.a[b]==null) continue;
 			ActivationSet e=errors.a[b].get(t);
 			ActivationSeq asb = as.a[b];
-			for(int i=0; i<in.count; ++i){
-				e.mult(in, i, asb.getDropout(dropoutOffset + i));
+			int n0 = tf.dims[0];
+			for(int i=0; i<tf.channels(); ++i){
+				int dro = asb.getDropout(dropoutOffset + i);
+				if(dro==0) {
+					for(int bri=0; bri<n0; ++bri) {
+						e.set(in, tf.index(bri, i), 0);
+					}		
+				}
+				//				for(int bri=0; bri<n0; ++bri) {
+				//					e.mult(in, tf.index(bri, i), dro);
+				//				}
 			}		
 		}
 	}
@@ -96,7 +136,7 @@ public class Dropout extends InOutCastLayer{
 	@Override
 	public void dontComputeInPhase(String phase) {
 	}
-//	@Override
+	//	@Override
 	public boolean wouldBackprop(String phase) {
 		return true;
 	}
@@ -106,8 +146,7 @@ public class Dropout extends InOutCastLayer{
 	public void initializeRun(ActivationBatch as, boolean training) {
 		if(training)
 			for(ActivationSeq a: as)
-				a.sampleDropout(dropoutOffset, in.count, keepProbability, r);
-//				a.sampleDropout(dropoutOffset, in.count, keepProbability);
+				a.sampleDropout(dropoutOffset, tf.channels(), keepProbability, r);
 	}
 	@Override
 	public Interface getIn() {

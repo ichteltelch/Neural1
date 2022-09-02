@@ -69,11 +69,11 @@ public class FirTextPrediction {
 //	.addLayer(Dropout.factory(0.9))
 	
 	.addLayer(2*depth*alphabet.length(), new Dense().regularizer(reg), new Nonlin(neuron))
-	.addLayer(Dropout.factory(0.9))
+	.addLayer(Dropout.factory(0.9, false))
 	
 //	.shortcut(alphabet.length()*depth/2)
 	.addLayer(depth*alphabet.length(), new Dense().regularizer(reg), new Nonlin(neuron))
-	.addLayer(Dropout.factory(0.9))
+	.addLayer(Dropout.factory(0.9, false))
 
 //	.addLayer(depth/3*alphabet.length(), new FullyConnected().regularizer(reg), new SimpleNonlinLayer(neuron))
 //	.addLayer(Dropout.factory(0.9))
@@ -86,13 +86,13 @@ public class FirTextPrediction {
 	int k=3;
 	InOutModule mod2 = new StackModule()
 	.addLayer(depth*alphabet.length(), new Copy(0, null))
-	.addLayer(Dropout.factory(0.9))
+	.addLayer(Dropout.factory(0.9, false))
 	.addLayer(depth*alphabet.length()*k, new Dense().regularizer(reg))
 	.addLayer(depth*alphabet.length(), new Maxout())
-	.addLayer(Dropout.factory(0.9))
+	.addLayer(Dropout.factory(0.9, false))
 	.addLayer(depth*alphabet.length()*k, new Dense().regularizer(reg))
 	.addLayer(depth*alphabet.length(), new Maxout())
-	.addLayer(Dropout.factory(0.9))
+	.addLayer(Dropout.factory(0.9, false))
 	.addLayer(depth/2*alphabet.length()*k, new Dense().regularizer(reg))
 	.addLayer(depth/2*alphabet.length(), new Maxout())
 //	.addLayer(Dropout.factory(0.5))
