@@ -1,4 +1,4 @@
-package org.siquod.neural1.examples;
+package org.siquod.ml.neural1.examples;
 
 import java.io.BufferedReader;
 import java.io.File;

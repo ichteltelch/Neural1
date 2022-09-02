@@ -1,4 +1,4 @@
-package org.siquod.neural1.examples;
+package org.siquod.ml.neural1.examples;
 
 import java.awt.Color;
 import java.awt.Graphics;
