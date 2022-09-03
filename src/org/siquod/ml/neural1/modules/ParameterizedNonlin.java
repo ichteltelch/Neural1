@@ -220,7 +220,12 @@ public class ParameterizedNonlin implements InOutModule{
 	//		d.declare(new InputDependency(in, this, 0));
 	//		d.declare(new OutputDependency(this, out));
 	//	}
-
+	@Override
+	public void initParams(ParamSet p) {
+		float v = (min + max) * 0.5f;
+		for(int i=0; i<alpha.count; ++i)
+			p.set(alpha, i, v);
+	}
 	@Override
 	public void dontComputeInPhase(String phase) {		
 	}
