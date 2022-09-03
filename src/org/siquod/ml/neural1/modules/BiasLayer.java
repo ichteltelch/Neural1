@@ -139,7 +139,8 @@ public class BiasLayer extends InOutCastLayer implements HasBias{
 				}
 			}			
 			
-		}	}
+		}	
+	}
 
 	@Override
 	public void dontComputeInPhase(String phase) {
