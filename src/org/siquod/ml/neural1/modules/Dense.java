@@ -296,7 +296,7 @@ public class Dense implements InOutBiasModule{
 			int startI = 0;
 			int endI = incount;
 			if(inst==null) {
-				packPropSlice(params, errors, t, incount, outcount, startA, endA, startI, endI);
+				backPropSlice(params, errors, t, incount, outcount, startA, endA, startI, endI);
 			}else {
 				int[] poso=inst;
 				backPropSlice(params, errors, t, incount, outcount, poso, startA, endA, startI, endI);
@@ -317,7 +317,7 @@ public class Dense implements InOutBiasModule{
 							int startI = 0;
 							int endI = incount;
 							if(inst==null) {
-								packPropSlice(params, errors, t, incount, outcount, startA, endA, startI, endI);
+								backPropSlice(params, errors, t, incount, outcount, startA, endA, startI, endI);
 							}else {
 								int[] poso=inst;
 								backPropSlice(params, errors, t, incount, outcount, poso, startA, endA, startI, endI);
@@ -356,7 +356,7 @@ public class Dense implements InOutBiasModule{
 			}
 		}
 	}
-	private void packPropSlice(ParamSet params, ActivationBatch errors, int t, int incount, int outcount, int startA,
+	private void backPropSlice(ParamSet params, ActivationBatch errors, int t, int incount, int outcount, int startA,
 			int endA, int startI, int endI) {
 		for(int b=startA; b<endA; ++b) {
 			if(errors.a[b]==null) continue;

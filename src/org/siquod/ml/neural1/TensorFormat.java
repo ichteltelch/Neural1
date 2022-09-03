@@ -119,7 +119,7 @@ public final class TensorFormat {
 		for(int d=0; d<dims.length; ++d) {
 			int iv = d==dims.length-1?c:i[d];
 			if(iv<0 || iv>=dims[d])
-				return -1;
+				return 0;
 		}
 		int r=c;
 		for(int d=dims.length-2; d>=0; --d) {
@@ -216,6 +216,30 @@ public final class TensorFormat {
 	@Override
 	public int hashCode() {
 		return Arrays.hashCode(dims);
+	}
+	public TensorFormat to2D() {
+		//TODO: optimize
+		TensorFormat tf = this;
+		while(tf.rank>2) {
+			tf = tf.flattenIndexAndNext(1);
+		}
+		if(tf.rank==1) {
+			tf = tf.insertUnitIndex(0);
+		}		
+		return tf;
+	}
+	public boolean equalExceptChannels(TensorFormat tf) {
+		if(rank!=tf.rank)
+			return false;
+		for(int i=rank-2; i>=0; --i)
+			if(dims[i]!=tf.dims[i])
+				return false;
+		return true;
+	}
+	public TensorFormat withChangedChannels(int newChannelCount) {
+		int[] nd = dims.clone();
+		nd[rank-1]=newChannelCount;
+		return new TensorFormat(nd);
 	}
 	
 }

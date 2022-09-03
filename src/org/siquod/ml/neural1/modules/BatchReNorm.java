@@ -57,13 +57,7 @@ public class BatchReNorm implements InOutScaleBiasModule{
 		if(!in.tf.equals(out.tf))
 			throw new IllegalArgumentException("input and output layer must be of the same size");
 		if(broadcast) {
-			tf=in.tf;
-			while(tf.rank>2) {
-				tf = tf.flattenIndexAndNext(1);
-			}
-			if(tf.rank==1) {
-				tf = tf.insertUnitIndex(0);
-			}
+			tf=in.tf.to2D();		
 		}else{
 			tf = new TensorFormat(1, in.count);
 		}
@@ -97,7 +91,7 @@ public class BatchReNorm implements InOutScaleBiasModule{
 
 	@Override
 	public ParamBlocks getParamBlocks() {
-		ParamBlocks ret = new ParamBlocks("Conv1D");
+		ParamBlocks ret = new ParamBlocks("BatchReNorm");
 		if(hasAdd) ret.add(add);
 		ret.add(mult);
 		ret.add(runningMean);

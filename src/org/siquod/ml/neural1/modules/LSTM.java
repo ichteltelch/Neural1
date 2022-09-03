@@ -188,20 +188,7 @@ public class LSTM implements InOutModule{
 		return Arrays.asList(exec);
 	}
 
-////	@Override
-//	public void declareDependencies(Dependencies d) {
-////		hMat.declareDependencies(d);
-////		xMat.declareDependencies(d);
-//		g1.declareDependencies(d);
-//		g2.declareDependencies(d);
-//		g3.declareDependencies(d);
-//		s1.declareDependencies(d);
-//		s2.declareDependencies(d);
-//		s3.declareDependencies(d);
-//		t1.declareDependencies(d);
-//		t2.declareDependencies(d);
-//		split.declareDependencies(d);
-//	}
+
 
 	@Override
 	public void dontComputeInPhase(String phase) {
