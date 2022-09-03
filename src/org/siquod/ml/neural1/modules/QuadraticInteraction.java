@@ -197,39 +197,39 @@ public class QuadraticInteraction implements InOutModule{
 		leftModule.forward(training, params, as, t, inst);
 		rightModule.forward(training, params, as, t, inst);
 		if(inst==null) {
-			int startA = 0;
-			int endA = as.length;
-			int startBri = 0;
-			int endBri = in2d.dims[0];
-			int inCount = in2d.channels();
+			final int startA = 0;
+			final int endA = as.length;
+			final int startBri = 0;
+			final int endBri = in2d.dims[0];
+			final int inCount = in2d.channels();
 			for(int ai = startA; ai<endA; ++ai) {
-				ActivationSeq at = as.a[ai];
+				final ActivationSeq at = as.a[ai];
 				if(at==null) continue;
-				ActivationSet a = at.get(t);
+				final ActivationSet a = at.get(t);
 				for(int bri=startBri; bri<endBri; ++bri) {
 					//Copy unmodified inputs
 					for(int i=0; i<inCount; ++i) {
-						a.add(out, product2d.index(bri, i), a.get(in, in2d.index(bri, i)));
+						a.add(products, product2d.index(bri, i), a.get(in, in2d.index(bri, i)));
 					}
 					//Compute quadratic interactions
 					for(Kernel krn: kernels) {
 						for(int rep=0; rep<krn.repetitions; ++rep) {
-							int leftOffset = krn.leftStart + rep*krn.leftMatDim;
-							int rightOffset = krn.rightStart + rep*krn.rightMatDim;
-							int outOffset = inCount + krn.outStart + rep*krn.outMatDim;
+							final int leftOffset = krn.leftStart + rep*krn.leftMatDim;
+							final int rightOffset = krn.rightStart + rep*krn.rightMatDim;
+							final int outOffset = inCount + krn.outStart + rep*krn.outMatDim;
 							for(int l = 0, oi=outOffset; l<krn.leftDim; ++l) {
-								int endR = krn.symmetric?l+1:krn.rightDim;
+								final int endR = krn.symmetric?l+1:krn.rightDim;
 								for(int r = 0; r<endR; ++r, ++oi) {
 									float sum = 0;
 									for(int m=0; m<krn.midDim; ++m) {
-										int li = leftOffset + l*krn.midDim + m;
-										float fl = a.get(leftFactors, left2d.index(bri, li));
-										float fr;
+										final int li = leftOffset + l*krn.midDim + m;
+										final float fl = a.get(leftFactors, left2d.index(bri, li));
+										final float fr;
 										if(krn.symmetric) {
-											int ri = leftOffset + r*krn.midDim + m;
+											final int ri = leftOffset + r*krn.midDim + m;
 											fr = a.get(leftFactors, left2d.index(bri, ri));
 										}else {
-											int ri = rightOffset + r*krn.midDim + m;
+											final int ri = rightOffset + r*krn.midDim + m;
 											fr = a.get(rightFactors, right2d.index(bri, ri));
 										}
 										sum += fl*fr;
@@ -254,7 +254,7 @@ public class QuadraticInteraction implements InOutModule{
 				{
 					//Copy unmodified inputs
 					for(int i=0; i<inCount; ++i) {
-						a.add(out, inst, i, a.get(in, inst, i));
+						a.add(products, inst, i, a.get(in, inst, i));
 					}
 					//Compute quadratic interactions
 					for(Kernel krn: kernels) {
@@ -299,45 +299,45 @@ public class QuadraticInteraction implements InOutModule{
 			return;
 		afterModule.backprop(phase, params, as, errors, t, inst);
 		if(inst==null) {
-			int startA = 0;
-			int endA = as.length;
-			int startBri = 0;
-			int endBri = in2d.dims[0];
-			int inCount = in2d.channels();
+			final int startA = 0;
+			final int endA = as.length;
+			final int startBri = 0;
+			final int endBri = in2d.dims[0];
+			final int inCount = in2d.channels();
 			for(int ai = startA; ai<endA; ++ai) {
-				ActivationSeq at = as.a[ai];
+				final ActivationSeq at = as.a[ai];
 				if(at==null) continue;
-				ActivationSet a = at.get(t);
-				ActivationSet e = errors.a[ai].get(t);
+				final ActivationSet a = at.get(t);
+				final ActivationSet e = errors.a[ai].get(t);
 
 
 				for(int bri=startBri; bri<endBri; ++bri) {
 					//Copy unmodified inputs
 					for(int i=0; i<inCount; ++i) {
-						a.add(out, product2d.index(bri, i), a.get(in, in2d.index(bri, i)));
+						e.add(in, in2d.index(bri, i), e.get(products, product2d.index(bri, i)));
 					}
 					//Compute quadratic interactions
 					for(Kernel krn: kernels) {
 						for(int rep=0; rep<krn.repetitions; ++rep) {
-							int leftOffset = krn.leftStart + rep*krn.leftMatDim;
-							int rightOffset = krn.rightStart + rep*krn.rightMatDim;
-							int outOffset = inCount + krn.outStart + rep*krn.outMatDim;
+							final int leftOffset = krn.leftStart + rep*krn.leftMatDim;
+							final int rightOffset = krn.rightStart + rep*krn.rightMatDim;
+							final int outOffset = inCount + krn.outStart + rep*krn.outMatDim;
 							for(int l = 0, oi=outOffset; l<krn.leftDim; ++l) {
-								int endR = krn.symmetric?l+1:krn.rightDim;
+								final int endR = krn.symmetric?l+1:krn.rightDim;
 								for(int r = 0; r<endR; ++r, ++oi) {
-									float err = e.get(products, product2d.index(bri, oi));
+									final float err = e.get(products, product2d.index(bri, oi));
 									for(int m=0; m<krn.midDim; ++m) {
-										int li = leftOffset + l*krn.midDim + m;
-										int lindex = left2d.index(bri, li);
-										float fl = a.get(leftFactors, lindex);
-										float fr;
-										int rindex;
+										final int li = leftOffset + l*krn.midDim + m;
+										final int lindex = left2d.index(bri, li);
+										final float fl = a.get(leftFactors, lindex);
+										final float fr;
+										final int rindex;
 										if(krn.symmetric) {
-											int ri = leftOffset + r*krn.midDim + m;
+											final int ri = leftOffset + r*krn.midDim + m;
 											fr = a.get(leftFactors, rindex = left2d.index(bri, ri));
 											e.add(leftFactors, rindex, err*fl);
 										}else {
-											int ri = rightOffset + r*krn.midDim + m;
+											final int ri = rightOffset + r*krn.midDim + m;
 											fr = a.get(rightFactors, rindex = right2d.index(bri, ri));
 											e.add(rightFactors, rindex, err*fl);
 										}
@@ -363,7 +363,7 @@ public class QuadraticInteraction implements InOutModule{
 
 				//Copy unmodified inputs
 				for(int i=0; i<inCount; ++i) {
-					a.add(out, inst, i, a.get(in, inst, i));
+					e.add(in, inst, i, e.get(products, inst, i));
 				}
 				//Compute quadratic interactions
 				for(Kernel krn: kernels) {
@@ -458,6 +458,10 @@ public class QuadraticInteraction implements InOutModule{
 		afterModule.initParams(p);
 	}
 
+	@Override
+	public void initializeRun(ActivationBatch as, boolean training) {
+		InOutModule.super.initializeRun(as, training);
+	}
 
 	@Override
 	public int dt() {
