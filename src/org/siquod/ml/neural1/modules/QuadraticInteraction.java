@@ -93,7 +93,7 @@ public class QuadraticInteraction implements InOutModule{
 			this.outStart = outStart;
 			symmetric = true;
 			leftMatDim = outerDim * innerDim;
-			rightMatDim = innerDim * outerDim;
+			rightMatDim = 0;
 			outMatDim = (outerDim * (outerDim+1)) /2;
 			leftLength = leftMatDim * repetitions;
 			rightLength = 0;
@@ -458,10 +458,6 @@ public class QuadraticInteraction implements InOutModule{
 		afterModule.initParams(p);
 	}
 
-	@Override
-	public void initializeRun(ActivationBatch as, boolean training) {
-		InOutModule.super.initializeRun(as, training);
-	}
 
 	@Override
 	public int dt() {
