@@ -109,6 +109,7 @@ public class FeedForward {
 					}
 					n+=bi;
 					bi=0;
+					net.initializeRun(ass, false);
 				}
 
 
@@ -175,6 +176,7 @@ public class FeedForward {
 							}
 						}
 						++ret[correctOutput][givenOutput];
+						net.initializeRun(ass, false);
 					}
 					bi=0;
 				}
