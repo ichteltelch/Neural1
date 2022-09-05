@@ -64,7 +64,9 @@ public class QuadraticInteraction implements InOutModule{
 		public final int rightEnd;
 		public final int outEnd;
 		public final boolean symmetric;
-		public Kernel(int leftDim, int midDim, int rightDim, int repetitions, int leftStart, int rightStart, int outStart) {
+		public final float scaleDown;
+
+		public Kernel(int leftDim, int midDim, int rightDim, int repetitions, int leftStart, int rightStart, int outStart, float scaleDown) {
 			this.leftDim = leftDim;
 			this.rightDim = rightDim;
 			this.midDim = midDim;
@@ -82,8 +84,9 @@ public class QuadraticInteraction implements InOutModule{
 			leftEnd = leftStart + leftLength;
 			rightEnd = rightStart + rightLength;
 			outEnd = outStart + outLength;
+			this.scaleDown=scaleDown;
 		}
-		public Kernel(int outerDim, int innerDim, int repetitions, int leftStart, int rightStart, int outStart) {
+		public Kernel(int outerDim, int innerDim, int repetitions, int leftStart, int rightStart, int outStart, float scaleDown) {
 			this.leftDim = outerDim;
 			this.rightDim = outerDim;
 			this.midDim = innerDim;
@@ -101,6 +104,7 @@ public class QuadraticInteraction implements InOutModule{
 			leftEnd = leftStart + leftLength;
 			rightEnd = rightStart + rightLength;
 			outEnd = outStart + outLength;
+			this.scaleDown=scaleDown;
 		}
 		@Override
 			public String toString() {
@@ -234,7 +238,7 @@ public class QuadraticInteraction implements InOutModule{
 										}
 										sum += fl*fr;
 									}
-									a.add(products, product2d.index(bri, oi), sum);
+									a.add(products, product2d.index(bri, oi), sum*krn.scaleDown);
 								}
 							}
 						}
@@ -279,7 +283,7 @@ public class QuadraticInteraction implements InOutModule{
 										}
 										sum += fl*fr;
 									}
-									a.add(products, inst, oi, sum);
+									a.add(products, inst, oi, sum*krn.scaleDown);
 								}
 							}
 						}
@@ -325,7 +329,7 @@ public class QuadraticInteraction implements InOutModule{
 							for(int l = 0, oi=outOffset; l<krn.leftDim; ++l) {
 								final int endR = krn.symmetric?l+1:krn.rightDim;
 								for(int r = 0; r<endR; ++r, ++oi) {
-									final float err = e.get(products, product2d.index(bri, oi));
+									final float err = e.get(products, product2d.index(bri, oi))*krn.scaleDown;
 									for(int m=0; m<krn.midDim; ++m) {
 										final int li = leftOffset + l*krn.midDim + m;
 										final int lindex = left2d.index(bri, li);
@@ -374,7 +378,7 @@ public class QuadraticInteraction implements InOutModule{
 						for(int l = 0, oi=outOffset; l<krn.leftDim; ++l) {
 							int endR = krn.symmetric?l+1:krn.rightDim;
 							for(int r = 0; r<endR; ++r, ++oi) {
-								float err = e.get(products, inst, oi);
+								float err = e.get(products, inst, oi)*krn.scaleDown;
 								for(int m=0; m<krn.midDim; ++m) {
 									int li = leftOffset + l*krn.midDim + m;
 									int lindex = left2d.index(inst, li);

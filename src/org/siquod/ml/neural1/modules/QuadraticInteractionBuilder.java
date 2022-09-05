@@ -19,6 +19,7 @@ public class QuadraticInteractionBuilder{
 	int rightAt = 0;
 	int outAt = 0;
 	int repetitions = 1;
+	float scaleDown = .1f;
 	InOutFactory produceLeft = PRODUCE_DEFAULT;
 	InOutFactory produceRight = PRODUCE_DEFAULT;
 	InOutFactory produceProduct = PRODUCE_DEFAULT;
@@ -28,7 +29,7 @@ public class QuadraticInteractionBuilder{
 		return this;
 	}
 	public QuadraticInteractionBuilder kernel(int left, int mid, int right) {
-		Kernel nk = new Kernel(left, mid, right, repetitions, leftAt, rightAt, outAt);
+		Kernel nk = new Kernel(left, mid, right, repetitions, leftAt, rightAt, outAt, scaleDown);
 		leftAt = nk.leftEnd;
 		rightAt = nk.rightEnd;
 		outAt = nk.outEnd;
@@ -36,7 +37,7 @@ public class QuadraticInteractionBuilder{
 		return this;
 	}
 	public QuadraticInteractionBuilder symmetricKernel(int outer, int inner) {
-		Kernel nk = new Kernel(outer, inner, repetitions, leftAt, rightAt, outAt);
+		Kernel nk = new Kernel(outer, inner, repetitions, leftAt, rightAt, outAt, scaleDown);
 		leftAt = nk.leftEnd;
 		rightAt = nk.rightEnd;
 		outAt = nk.outEnd;
@@ -62,6 +63,10 @@ public class QuadraticInteractionBuilder{
 		Objects.requireNonNull(f);
 		produceLeft = f;
 		produceRight = f;
+		return this;
+	}
+	public QuadraticInteractionBuilder scale(double s) {
+		scaleDown = (float) s;
 		return this;
 	}
 	public QuadraticInteractionBuilder outputModule(InOutFactory f) {
