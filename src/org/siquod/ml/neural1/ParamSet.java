@@ -26,9 +26,13 @@ public final class ParamSet implements Cloneable{
 	public float get(ParamBlock i, int index){
 		assert index>=0;
 		assert index<i.count;
+//		if(13352==i.start + index)
+//			System.out.println();
 		return value[i.start + index];
 	}
 	public float get(int index) {
+//		if(13352== index)
+//			System.out.println();
 		return value[index];
 	}
 	public void add(int index, double d) {

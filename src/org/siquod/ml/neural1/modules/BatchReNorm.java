@@ -564,7 +564,6 @@ public class BatchReNorm implements InOutScaleBiasModule{
 	@Override
 	public void updateStatistics(ActivationSeq stat, ParamSet params, Function<Integer, Float> owt_fun, float[] weight, int tMin) {
 		float owt=owt_fun.apply(age++);
-		System.out.print("");
 		int ch = tf.channels();
 		for(int i=0; i<ch; ++i) {
 			float smean, ssdev, swt;

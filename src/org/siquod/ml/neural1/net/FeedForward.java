@@ -228,7 +228,8 @@ public class FeedForward {
 		public float globReg=1;
 		int batchCounter=0;
 		int currentBatchSize=0;
-		private float[] imp;		
+		private float[] imp;
+		public float batchReNormWeight = 0.1f;;		
 		@Override
 		public NaiveTrainer clone() {
 			NaiveTrainer r;
@@ -346,7 +347,7 @@ public class FeedForward {
 			lossLayer.gradients("training", ps, ass, ess, grad, 0, null);
 			net.gradients("training", ps, ass, ess, grad, 0, null);
 			Function<Integer, Float> owt = batchCounter -> (float)Math.log(batchCounter+1);
-			float[] weight = {.1f};
+			float[] weight = {batchReNormWeight };
 
 
 			//			ass.clear();

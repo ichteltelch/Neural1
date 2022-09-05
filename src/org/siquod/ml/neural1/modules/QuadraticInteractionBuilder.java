@@ -5,20 +5,23 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 import org.siquod.ml.neural1.modules.QuadraticInteraction.Kernel;
+import org.siquod.ml.neural1.modules.regularizer.L2Reg;
+import org.siquod.ml.neural1.modules.regularizer.Regularizer;
 
 public class QuadraticInteractionBuilder{
+	public static final Regularizer DEFAULT_REG =new L2Reg(.00001); 
 	@FunctionalInterface
 	public static interface Configurator extends Consumer<QuadraticInteractionBuilder>{}
 	public static final Configurator PRINT = q->System.out.println(q.kernels);
-	public static final InOutFactory PRODUCE_DEFAULT = (i, o) ->	new Dense(true);
-	public static final InOutFactory PRODUCE_DEFAULT_NOBIAS = (i, o) ->	new Dense(false);
+	public static final InOutFactory PRODUCE_DEFAULT = (i, o) ->	new Dense(true).regularizer(DEFAULT_REG);
+	public static final InOutFactory PRODUCE_DEFAULT_NOBIAS = (i, o) ->	new Dense(false).regularizer(DEFAULT_REG);
 	int leftAt = 0;
 	int rightAt = 0;
 	int outAt = 0;
 	int repetitions = 1;
 	InOutFactory produceLeft = PRODUCE_DEFAULT;
 	InOutFactory produceRight = PRODUCE_DEFAULT;
-	InOutFactory produceProduct = PRODUCE_DEFAULT_NOBIAS;
+	InOutFactory produceProduct = PRODUCE_DEFAULT;
 	ArrayList<Kernel> kernels = new ArrayList<>();
 	public QuadraticInteractionBuilder config(Consumer<? super QuadraticInteractionBuilder> configurator) {
 		configurator.accept(this);

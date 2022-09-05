@@ -10,45 +10,61 @@ import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 
+import org.siquod.ml.neural1.Interface;
 import org.siquod.ml.neural1.modules.BatchReNorm;
+import org.siquod.ml.neural1.modules.Copy;
 import org.siquod.ml.neural1.modules.Dense;
 import org.siquod.ml.neural1.modules.Dropout;
+import org.siquod.ml.neural1.modules.InOutCastFactory;
+import org.siquod.ml.neural1.modules.InOutCastLayer;
 import org.siquod.ml.neural1.modules.InOutModule;
 import org.siquod.ml.neural1.modules.Nonlin;
+import org.siquod.ml.neural1.modules.ParameterizedNonlin;
+import org.siquod.ml.neural1.modules.QuadraticInteraction;
 import org.siquod.ml.neural1.modules.StackModule;
 import org.siquod.ml.neural1.modules.loss.SoftMaxNllLoss;
 import org.siquod.ml.neural1.modules.regularizer.L2Reg;
 import org.siquod.ml.neural1.modules.regularizer.Regularizer;
 import org.siquod.ml.neural1.net.FeedForward;
+import org.siquod.ml.neural1.neurons.FadeInNeuron;
 import org.siquod.ml.neural1.neurons.Isrlu;
 import org.siquod.ml.neural1.neurons.Neuron;
 import org.siquod.ml.neural1.optimizers.*;
 
 
-public class ClassifyTest {
+public class QITest {
 
 	//Example data sets
-	static float[][][] data1;
-	static float[][][] data2;
+//	static float[][][] data1;
+//	static float[][][] data2;
+	static float[][][] data3;
 	static{
-		data1=new float[3][100][2];
-		float[] cx = {1,-.5f,-.5f};
-		float[] cy = {0,(float) Math.sqrt(.75),(float) -Math.sqrt(.75)};
 		Random rnd=new Random(12345);
-		for(int i=0; i<data1.length; i++){
-			for(int j=0; j<data1[i].length; j++){
-				data1[i][j][0] = (float) (cx[i] + rnd.nextGaussian()*.5);
-				data1[i][j][1] = (float) (cy[i] + rnd.nextGaussian()*.5);
-			}
-		}
-		data2=new float[3][200000][2];
-		for(int i=0; i<data2.length; i++){
-			for(int j=0; j<data2[i].length; j++){
-				float pj = (float) (rnd.nextDouble()*200);
-				float rad = (float) (pj*.3f+1);
-				float ang = (float) (2*Math.PI*(i/3.0 + pj/(15.0*20)+Math.cos(rad*.03)));
-				data2[i][j][0] = (float) (Math.cos(ang)*rad+ rnd.nextGaussian()*6);
-				data2[i][j][1] = (float) (Math.sin(ang)*rad+ rnd.nextGaussian()*6);
+//		data1=new float[3][100][2];
+//		float[] cx = {1,-.5f,-.5f};
+//		float[] cy = {0,(float) Math.sqrt(.75),(float) -Math.sqrt(.75)};
+//		for(int i=0; i<data1.length; i++){
+//			for(int j=0; j<data1[i].length; j++){
+//				data1[i][j][0] = (float) (cx[i] + rnd.nextGaussian()*.5);
+//				data1[i][j][1] = (float) (cy[i] + rnd.nextGaussian()*.5);
+//			}
+//		}
+//		data2=new float[3][200][2];
+//		for(int i=0; i<data2.length; i++){
+//			for(int j=0; j<data2[i].length; j++){
+//				float rad = j*.3f+1;
+//				float ang = (float) (2*Math.PI*(i/3.0 + j/(15.0*20)+Math.cos(rad*.03)));
+//				data2[i][j][0] = (float) (Math.cos(ang)*rad+ rnd.nextGaussian()*6);
+//				data2[i][j][1] = (float) (Math.sin(ang)*rad+ rnd.nextGaussian()*6);
+//			}
+//		}		
+		data3=new float[3][200][2];
+		for(int i=0; i<data3.length; i++){
+			for(int j=0; j<data3[i].length; j++){
+				float rad = (float) (i*20);
+				float ang = (float) (2*Math.PI*rnd.nextDouble());
+				data3[i][j][0] = (float) (Math.cos(ang)*rad+ rnd.nextGaussian()*8);
+				data3[i][j][1] = (float) (Math.sin(ang)*rad+ rnd.nextGaussian()*8);
 			}
 		}		
 	}
@@ -64,19 +80,17 @@ public class ClassifyTest {
 
 	//Define the main network module as a stack of layers
 	InOutModule mod = new StackModule()
-			//			.addLayer(2, new BatchNorm())
-			//Add a dense layer, followed by a batch normalization layer, with 50 channels each
-			.addLayer(50, new Dense().regularizer(reg), new BatchReNorm())
-			//Add a nonlinearity layer using the chosen activation function
-			.addLayer(50, new Nonlin(neuron))
-			//Add a dropout layer for better regularization
-			.addLayer(Dropout.factory(0.9))
-			//Add another dense and batch norm and nonlinearity layer, with 40 channels each
-			.addLayer(40, new Dense().regularizer(reg), new BatchReNorm(), new Nonlin(neuron))
-			//And another dropout layer
-			.addLayer(Dropout.factory(.9))
 			//Add a final dense layer
-			.addFinalLayer(3, new Dense().regularizer(reg))
+			.addLayer(5, QuadraticInteraction.b()
+//					.repetitions(3).kernel(1, 1, 1)
+					.repetitions(2).symmetricKernel(2, 1)
+//					.bothModules((i, o)->new Copy())
+					//.outputModule((i, o)->new Dense())
+					.build()
+					)
+			.addLayer(5, new ParameterizedNonlin(new FadeInNeuron(neuron)))
+			.addLayer(2, new Dense().regularizer(reg))
+			.addFinalLayer(2, new Copy())
 			;
 	
 	//Another example of a network definition
@@ -126,14 +140,14 @@ public class ClassifyTest {
 	private BufferedImage dispOutput;
 	
 	//Whether to use minibatches, or just a single batch made of the whole data set.
-	boolean miniBatches=true;
+	boolean miniBatches=false;
 
 	//the batch size
-	int batchSize=16;
+	int batchSize;
 
 
 
-	public ClassifyTest(float[][][] data){
+	public QITest(float[][][] data){
 		this.data=data;
 		
 		//make the display
@@ -147,7 +161,7 @@ public class ClassifyTest {
 
 		//determine batch size
 		if(miniBatches) {
-			//batchSize=128*8;
+			batchSize=128;
 		}else {
 			batchSize=0;
 			for(float[][] a : data)
@@ -168,7 +182,7 @@ public class ClassifyTest {
 
 	private void run() {
 		while(true){
-			batchTrain(miniBatches?10:10);
+			batchTrain(miniBatches?1:100);
 			updateGraphics();
 			disp.repaint();
 		}
@@ -195,7 +209,9 @@ public class ClassifyTest {
 		double maxY = tymax + (tymax-tymin)*margin;
 
 		Color[] colors={
-				Color.red, Color.green, Color.blue
+				new Color(1, 0, 0, 0.7f),
+				new Color(0, 1, 0, 0.7f),
+				new Color(0, 0, 1, 0.7f),
 		};
 
 
@@ -224,9 +240,7 @@ public class ClassifyTest {
 		System.out.println("Update time: "+(t1-t0));
 		Graphics g=dispOutput.getGraphics();
 		for(int c=0; c<data.length; c++){
-			float[][] dc= data[c];
-			for(int i=0; i<200 && i<dc.length; ++i){
-				float[] dat = dc[i];
+			for(float[] dat: data[c]){
 				int ix = (int) ((dat[0]-minX)*wx/(maxX-minX));
 				int iy = (int) ((dat[1]-minY)*wy/(maxY-minY));
 				int r = 4;
@@ -268,6 +282,6 @@ public class ClassifyTest {
 		}
 	}
 	public static void main(String[] args) {
-		new ClassifyTest(data2).run();
+		new QITest(data3).run();
 	}
 }

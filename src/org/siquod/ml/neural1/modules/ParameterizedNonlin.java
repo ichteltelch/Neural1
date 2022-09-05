@@ -29,6 +29,9 @@ public class ParameterizedNonlin implements InOutModule{
 	ParamBlock alpha;
 	float min, max, regL1, regL2;
 	TensorFormat tf;
+	public ParameterizedNonlin(ParameterizedNeuron n){
+		this(n, 0, 1, 0.000001f, 0.001f);
+	}
 
 	public ParameterizedNonlin(ParameterizedNeuron n, float min, float max, float regL1, float regL2){
 		this.n=n;
@@ -210,7 +213,7 @@ public class ParameterizedNonlin implements InOutModule{
 				}else {
 					continue;
 				}
-				gradients.add(alpha, i, grad);
+				gradients.add(alpha, i, grad*globReg);
 			}
 		}
 	}
