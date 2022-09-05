@@ -118,7 +118,7 @@ public class ParameterizedNonlin implements InOutModule{
 	@Override
 	public void backprop(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, int t, int[] pos) {
 		if(pos==null) {
-			int incount = in.count;
+			int incount = in.channels();
 			int n0 = tf.dims[0];
 			for(int b=0; b<as.length; ++b) {
 				if(errors.a[b]==null) continue;
@@ -157,7 +157,7 @@ public class ParameterizedNonlin implements InOutModule{
 		// do
 		// da = do * (f(i) - i)
 		if(pos==null) {
-			int incount = in.count;
+			int incount = in.channels();
 			int n0 = tf.dims[0];
 			for(int b=0; b<as.length; ++b) {
 				if(errors.a[b]==null) continue;

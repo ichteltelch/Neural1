@@ -14,6 +14,7 @@ import org.siquod.ml.neural1.Module;
 import org.siquod.ml.neural1.ParamAllocator;
 import org.siquod.ml.neural1.ParamBlocks;
 import org.siquod.ml.neural1.ParamSet;
+import org.siquod.ml.neural1.TensorFormat;
 
 /**
  * This module simply copies its input, but possibly form a different instant in time.
@@ -26,9 +27,10 @@ public class Copy implements InOutModule{
 	int[] posi;
 	Interface in;
 	Interface out;
+	TensorFormat inTf, outTf;
 	HashSet<String> dontBackprop=new HashSet<>();
 	public int width=-1;
-	public Copy(int dt, int [] shift){
+	public Copy(int dt, int... shift){
 		this.dt=dt;
 		this.shift=shift==null?null:shift.clone();
 		posi=shift==null?null:new int[shift.length];
@@ -52,10 +54,12 @@ public class Copy implements InOutModule{
 	public void allocate(InterfaceAllocator ia) {
 		in=ia.get("in");
 		out=ia.get("out");
-		int incount = shift==null?in.count:in.channels();
-		int outcount = shift==null?out.count:out.channels();
+		int incount = in.channels();
+		int outcount = out.channels();
 		if(out.tf==null && incount==outcount)
 			out.tf=in.tf;
+		inTf = in.tf.to2D();
+		outTf = out.tf.to2D();
 		if(width==-1){
 			width=Math.min(incount, outcount);
 		}else{
@@ -85,8 +89,10 @@ public class Copy implements InOutModule{
 				if(ia==null)
 					continue;
 				ActivationSet oa=a.get(t);
-				for(int i=0; i<width; ++i) {
-					oa.add(out, i, ia.get(in, i));
+				for(int bri =0; bri<inTf.dims[0]; ++bri) {
+					for(int i=0; i<width; ++i) {
+						oa.add(out, outTf.index(bri, i), ia.get(in, inTf.index(bri, i)));
+					}
 				}
 			}
 
@@ -120,8 +126,11 @@ public class Copy implements InOutModule{
 				ActivationSet ie=e.get(t+dt);
 				if(ie==null) continue;
 				ActivationSet oe=e.get(t);
-				for(int i=0; i<width; ++i) {
-					ie.add(in, i, oe.get(out, i));
+				for(int bri =0; bri<inTf.dims[0]; ++bri) {
+
+					for(int i=0; i<width; ++i) {
+						ie.add(in, inTf.index(bri, i), oe.get(out, outTf.index(bri, i)));
+					}
 				}
 			}
 		}else {
@@ -142,11 +151,11 @@ public class Copy implements InOutModule{
 			}
 		}
 	}
-//	//	@Override
-//	public void declareDependencies(Dependencies d) {
-//		d.declare(new InputDependency(in, this, dt));
-//		d.declare(new OutputDependency(this, out));
-//	}
+	//	//	@Override
+	//	public void declareDependencies(Dependencies d) {
+	//		d.declare(new InputDependency(in, this, dt));
+	//		d.declare(new OutputDependency(this, out));
+	//	}
 
 	@Override
 	public void dontComputeInPhase(String phase) {		

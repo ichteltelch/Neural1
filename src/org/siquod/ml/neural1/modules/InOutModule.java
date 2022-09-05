@@ -15,7 +15,7 @@ public interface InOutModule extends Module{
 		allocate(ia);
 		ia.pop();
 	}
-	public default InOutModule shift(int[] shift){
+	public default InOutModule shift(int... shift){
 		throw new UnsupportedOperationException("Cannot modify shift of this module");
 	}
 	public default InOutModule dt(int dt){

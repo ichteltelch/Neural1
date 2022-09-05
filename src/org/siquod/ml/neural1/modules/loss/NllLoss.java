@@ -88,6 +88,8 @@ public class NllLoss extends LossLayer{
 			float r = 0;
 			for(int bri = 0; bri<n0; ++bri) {
 				for(LossGroup lg: lgs) {
+					if(lg.weight==0)
+						continue;
 					float gate;
 					if(lg.isGated()) {
 						gate =  a.get(target, tf.index(bri, lg.gate));
@@ -101,15 +103,20 @@ public class NllLoss extends LossLayer{
 					}
 					float rr = 0;
 					if(lg.isSingleton()) {
-						int index = tf.index(bri, lg.start);
+						int i = lg.start;
+						int index = tf.index(bri, i);
 						double trg = a.get(target, index);
 						double pp = a.get(in, index);
 
 						if (trg>0) {
-							rr += trg*(Math.log(trg)-pp);
+							rr += trg*(Math.log(trg)-Math.log(pp));
 						}
 						if(trg<1) {
-							rr += (1-trg)*(Math.log(1-trg)-(1-pp));
+							rr += (1-trg)*(Math.log(1-trg)-Math.log(1-pp));
+						}
+						if(!Float.isFinite(rr)) {
+							System.out.println();
+							rr = 0;
 						}
 					}else {
 						for(int i=lg.start; i<lg.end; i++){
@@ -118,6 +125,10 @@ public class NllLoss extends LossLayer{
 							if (trg<=0) continue;
 							double pp = a.get(in, index);
 							rr += trg*(Math.log(trg)-pp);
+							if(!Float.isFinite(rr)) {
+								System.out.println();
+							}
+
 						}
 					}
 					r += rr*gate;
@@ -139,6 +150,8 @@ public class NllLoss extends LossLayer{
 			float e=es.get(loss, 0);
 			for(int bri = 0; bri<n0; ++bri) {
 				for(LossGroup lg: lgs) {
+					if(lg.weight==0)
+						continue;
 					float gate;
 					if(lg.isGated()) {
 						gate =  a.get(target, tf.index(bri, lg.gate));
@@ -150,10 +163,46 @@ public class NllLoss extends LossLayer{
 					}else {
 						gate = lg.weight;
 					}
-					for(int i=lg.start; i<lg.end; i++){
+					float ge = gate*e;
+					
+					if(lg.isSingleton()) {
+						int i = lg.start;
 						int index = tf.index(bri, i);
-						es.add(in, i, -a.get(target, index)*(e*gate));
-					}	
+						float trg = a.get(target, index);
+						float pp = a.get(in, index);
+						
+						float ppe=0;
+						if (trg>0) {
+							ppe += trg*(-1/(pp));
+						}
+						if(trg<1) {
+							ppe += (1-trg)*(1/(1-pp));
+						}
+						if(!Float.isFinite(ppe)) {
+							System.out.println();
+							ppe=0;
+						}
+						es.add(in, index, ppe*ge);
+
+					}else {
+//						for(int i=lg.start; i<lg.end; i++){
+//							int index = tf.index(bri, i);
+//							double trg = a.get(target, index);
+//							if (trg<=0) continue;
+//							double pp = a.get(in, index);
+//							rr += trg*(Math.log(trg)-pp);
+//							if(!Float.isFinite(rr)) {
+//								System.out.println();
+//							}
+//
+//						}
+						for(int i=lg.start; i<lg.end; i++){
+							int index = tf.index(bri, i);
+							es.add(in, index, -a.get(target, index)*ge);
+						}	
+					}
+					
+
 				}
 			}
 		}

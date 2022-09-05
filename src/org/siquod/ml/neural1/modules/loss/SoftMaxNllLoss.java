@@ -34,7 +34,7 @@ public class SoftMaxNllLoss extends LossLayer{
 	@Override
 	public void allocate(InterfaceAllocator ia) {
 		Interface in=ia.get("in");
-		hidden=ia.allocate(new Interface(hiddenName, in.count, null));
+		hidden=ia.allocate(new Interface(hiddenName, in.tf));
 		sm.allocate(ia, "in", hidden.name);
 		loss.allocate(ia, hidden.name, "target", "loss");
 	}

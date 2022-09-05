@@ -8,6 +8,8 @@ public final class ParamBlock extends Params{
 	public ParamBlock(String name, int count){
 		super(name);
 		this.count=count;
+		if(count>40000)
+			System.out.println();
 	}
 	HashSet<String> dontLearn=new HashSet<>();
 	@Override

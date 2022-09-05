@@ -11,12 +11,18 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
+import org.siquod.ml.data.RepWhitener.RepIndexer;
+
 
 
 public interface Whitener {
 	void whiten(double[] in, double[] out);
 	void whiten(float[] in, float[] out);
 	int dim();
+	
+	public default RepWhitener rep(int repetitions, RepIndexer repi) {
+		return new RepWhitener(this, repetitions, repi);
+	}
 	static class GaussianWhitener implements Whitener{
 		public final double[] µ;
 		public final double[] invSigma;

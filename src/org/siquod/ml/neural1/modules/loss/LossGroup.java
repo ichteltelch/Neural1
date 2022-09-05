@@ -88,7 +88,8 @@ final public class LossGroup{
 		 * @return
 		 */
 		public LossGroupsBuilder group(int length) {
-			groups.add(new LossGroup(position+=length, length, gate, inverted, weight));
+			groups.add(new LossGroup(position, length, gate, inverted, weight));
+			position+=length;
 			return this;
 		}
 		/**

@@ -278,4 +278,12 @@ public class Conv1D implements InOutBiasModule{
 	public ParamBlock getBias() {
 		return bias;
 	}
+	public Conv1D useBias(boolean b) {
+		useBias=b;
+		return this;
+	}
+	public Conv1D useCoordinateBias(boolean b) {
+		useCoordinateBias=b;
+		return this;
+	}
 }

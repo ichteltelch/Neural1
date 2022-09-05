@@ -101,6 +101,15 @@ public class LogSoftmax implements InOutModule{
 					if(singleton) {
 						max = 0;
 						sum = 1;
+						int i = lg.start;
+						int index = tf.index(bri, i);
+						float raw = a.get(in, index);
+						float o = (float) (1/(1+Math.exp(-raw)));
+						if(!Float.isFinite(o))
+							System.out.println();
+						a.add(out, index, o);
+						//			check+=Math.exp(a.get(out, i));
+
 					}else {
 						max=Float.NEGATIVE_INFINITY;
 						for(int i=iStart; i<iEnd; ++i){
@@ -109,22 +118,24 @@ public class LogSoftmax implements InOutModule{
 								max=av;
 						}
 						sum = 0;
+						for(int i=iStart; i<iEnd; ++i){
+							double av = a.get(in, tf.index(bri, i));			
+							sum += Math.exp(av-max);
+						}
+						float logSum = (float) Math.log(sum);
+						for(int i=iStart; i<iEnd; ++i){
+							//				if(a.get(out, tf.index(i0, i))!=0)
+							//					System.out.println();
+							//			check2+=Math.exp(a.get(in, i) - logSum);
+							int index = tf.index(bri, i);
+							float raw = a.get(in, index);
+							float o = raw - max - logSum;
+							a.add(out, index, o);
+							//			check+=Math.exp(a.get(out, i));
+						}
 					}
 
-					for(int i=iStart; i<iEnd; ++i){
-						double av = a.get(in, tf.index(bri, i));			
-						sum += Math.exp(av-max);
-					}
-					float logSum = (float) Math.log(sum);
-					for(int i=iStart; i<iEnd; ++i){
-						//				if(a.get(out, tf.index(i0, i))!=0)
-						//					System.out.println();
-						//			check2+=Math.exp(a.get(in, i) - logSum);
-						int index = tf.index(bri, i);
-						float o = a.get(in, index) - max - logSum;
-						a.add(out, index, o);
-						//			check+=Math.exp(a.get(out, i));
-					}
+
 				}
 			}
 			//		System.out.println("check: "+check+" "+check2);
@@ -154,9 +165,9 @@ public class LogSoftmax implements InOutModule{
 						int i = iStart;
 						int index = tf.index(bri, i);
 						float od=e.get(out, index);
-						float ei = (float)Math.exp(a.get(in, index));
-						float sum =  1 + ei;
-						e.add(in, index, od*(1 - ei/sum));
+						float erg = a.get(out, index);
+						float d =  erg * (1-erg);
+						e.add(in, index, od*d);
 
 					}else {
 						float odSum=0;

@@ -2,7 +2,9 @@ package org.siquod.ml.neural1;
 
 import java.util.Arrays;
 
-public final class TensorFormat {
+import org.siquod.ml.data.RepWhitener.RepIndexer;
+
+public final class TensorFormat implements RepIndexer{
 	public final int rank;
 	public final int[] dims;
 	public TensorFormat(int... dims){
