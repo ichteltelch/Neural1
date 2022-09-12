@@ -179,7 +179,6 @@ public class NllLoss extends LossLayer{
 							ppe += (1-trg)*(1/(1-pp));
 						}
 						if(!Float.isFinite(ppe)) {
-							System.out.println();
 							ppe=0;
 						}
 						es.add(in, index, ppe*ge);
