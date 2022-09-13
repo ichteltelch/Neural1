@@ -15,29 +15,49 @@ public class GenericFileCursor implements TrainingBatchCursor.RandomAccess, Auto
     InputStream fromFile;
     int output;
     double[] fixedOutput;
-    int floatsPerSet;
-    double[] values; 
+    int inputFloatsPerSet;
+    double[] inputValues; 
+    final double[] outputValues; 
     boolean normalizeWeights;
     int oneHot;
-  
+    final int outputFloatsPerSet;
+    final int outputFloatsInFile;
 
     public GenericFileCursor(File file, int output, int oneHot, int floatsPerSet, boolean normalizeWeights) {
     	inputFile=file;
         this.output=output;
-        this.floatsPerSet=floatsPerSet;
-        values = new double[floatsPerSet];
+        this.inputFloatsPerSet=floatsPerSet;
+        inputValues = new double[floatsPerSet];
         this.normalizeWeights=normalizeWeights;
         this.oneHot = oneHot;
+        outputFloatsPerSet=fixedOutput!=null?fixedOutput.length:oneHot==0?1:oneHot;
+        outputFloatsInFile=0;
+        outputValues=null;
+        reset();
+    }
+    public GenericFileCursor(File file, int inputFloatsPerSet, int outputFloatsPerSet, boolean normalizeWeights) {
+    	inputFile=file;
+        this.output=-1;
+        this.inputFloatsPerSet=inputFloatsPerSet;
+        inputValues = new double[inputFloatsPerSet];
+        this.normalizeWeights=normalizeWeights;
+        this.oneHot = -1;
+        this.outputFloatsPerSet=outputFloatsPerSet;
+        outputFloatsInFile=outputFloatsPerSet;
+        outputValues=new double[outputFloatsPerSet];
         reset();
     }
     public GenericFileCursor(File file, double[] fixedOutput, int floatsPerSet, boolean normalizeWeights) {
     	inputFile=file;
         this.output=0;
-        this.floatsPerSet=floatsPerSet;
-        values = new double[floatsPerSet];
+        this.inputFloatsPerSet=floatsPerSet;
+        inputValues = new double[floatsPerSet];
         this.normalizeWeights=normalizeWeights;
         this.oneHot = -1;
         this.fixedOutput=fixedOutput;
+        outputFloatsPerSet=fixedOutput.length;
+        outputFloatsInFile=0;
+        outputValues=null;
         reset();
     }
 
@@ -48,7 +68,7 @@ public class GenericFileCursor implements TrainingBatchCursor.RandomAccess, Auto
                 fromFile.close();
             fromFile=new BufferedInputStream(new FileInputStream(inputFile));
             // entryCount = total bytes/ (#datapoints in set * # bytes in datapoint)
-            entryCount=inputFile.length()/(floatsPerSet*4);
+            entryCount=inputFile.length()/(inputFloatsPerSet*4);
             position=0;
             if (entryCount>0)
                 loadNextDataPoint();
@@ -59,7 +79,7 @@ public class GenericFileCursor implements TrainingBatchCursor.RandomAccess, Auto
 
     @Override
     public GenericFileCursor clone() {
-        return new GenericFileCursor(inputFile, output, oneHot, floatsPerSet, normalizeWeights);
+        return new GenericFileCursor(inputFile, output, oneHot, inputFloatsPerSet, normalizeWeights);
     }
 
     @Override
@@ -76,10 +96,12 @@ public class GenericFileCursor implements TrainingBatchCursor.RandomAccess, Auto
     }
     private void loadNextDataPoint() {
         try {
-           for (int i=0; i<values.length; i++) {
-        	   values[i]=readFloat(fromFile);
+           for (int i=0; i<inputValues.length; i++) {
+        	   inputValues[i]=readFloat(fromFile);
            }
-          
+           for (int i=0; i<outputFloatsInFile; i++) {
+        	   outputValues[i]=readFloat(fromFile);
+           }  
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -105,12 +127,14 @@ public class GenericFileCursor implements TrainingBatchCursor.RandomAccess, Auto
 
     @Override
     public void giveInputs(double[] inputs) {
-    	System.arraycopy(values, 0, inputs, 0, values.length);
+    	System.arraycopy(inputValues, 0, inputs, 0, inputValues.length);
     }
 
     @Override
     public void giveOutputs(double[] outputs) {
-    	if(fixedOutput!=null) {
+    	if(outputValues!=null) {
+    		System.arraycopy(outputValues, 0, outputs, 0, outputFloatsInFile);
+    	}else if(fixedOutput!=null) {
     		System.arraycopy(fixedOutput, 0, outputs, 0, fixedOutput.length);
     	}else if(oneHot==0) {
     		outputs[0]=output;
@@ -130,12 +154,12 @@ public class GenericFileCursor implements TrainingBatchCursor.RandomAccess, Auto
 
     @Override
     public int inputCount() {
-        return floatsPerSet;
+        return inputFloatsPerSet;
     }
 
     @Override
     public int outputCount() {
-        return fixedOutput!=null?fixedOutput.length:oneHot==0?1:oneHot;
+        return outputFloatsPerSet;
     }
     
     @Override
@@ -154,7 +178,7 @@ public class GenericFileCursor implements TrainingBatchCursor.RandomAccess, Auto
 			reset();
 		}
 		if(position>this.position) {
-			long toSkip = (position-this.position - 1)*4*floatsPerSet;
+			long toSkip = (position-this.position - 1)*4*inputFloatsPerSet;
 			try {
 				while(toSkip>0) {
 					long skipped = fromFile.skip(toSkip);
