@@ -18,7 +18,7 @@ import org.siquod.ml.neural1.ParamSet;
 import org.siquod.ml.neural1.modules.regularizer.Regularizer;
 
 /**
- * This module performs a linear mapping from its input vecotr to its output vector
+ * This module performs a linear mapping from its input vector to its output vector
  * @author bb
  *
  */
@@ -446,7 +446,7 @@ public class Sparse implements InOutBiasModule{
 		dt=d;
 		return this;
 	}
-	public Sparse shift(int[] shift){
+	public Sparse shift(int... shift){
 		this.shift=shift==null?null:shift.clone();
 		posi=shift==null?null:new int[shift.length];
 		return this;

@@ -598,7 +598,7 @@ public class Dense implements InOutBiasModule{
 		dt=d;
 		return this;
 	}
-	public Dense shift(int[] shift){
+	public Dense shift(int... shift){
 		this.shift=shift==null?null:shift.clone();
 		posi=shift==null?null:new int[shift.length];
 		return this;
