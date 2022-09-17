@@ -68,7 +68,7 @@ public class GenericFileCursor implements TrainingBatchCursor.RandomAccess, Auto
                 fromFile.close();
             fromFile=new BufferedInputStream(new FileInputStream(inputFile));
             // entryCount = total bytes/ (#datapoints in set * # bytes in datapoint)
-            entryCount=inputFile.length()/(inputFloatsPerSet*4);
+            entryCount=inputFile.length()/((inputFloatsPerSet+outputFloatsInFile)*4);
             position=0;
             if (entryCount>0)
                 loadNextDataPoint();
@@ -101,14 +101,17 @@ public class GenericFileCursor implements TrainingBatchCursor.RandomAccess, Auto
            }
            for (int i=0; i<outputFloatsInFile; i++) {
         	   outputValues[i]=readFloat(fromFile);
-           }  
+          }  
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 	public static float readFloat(InputStream under) throws IOException{
 		int bits=readInt(under);
-		return Float.intBitsToFloat(bits);
+		float f = Float.intBitsToFloat(bits);
+//		if(Double.isNaN(f))
+//			System.out.println();
+		return f;
 	}
 	public static int readInt(InputStream under) throws IOException{
 		return 
@@ -178,7 +181,7 @@ public class GenericFileCursor implements TrainingBatchCursor.RandomAccess, Auto
 			reset();
 		}
 		if(position>this.position) {
-			long toSkip = (position-this.position - 1)*4*inputFloatsPerSet;
+			long toSkip = (position-this.position - 1)*4*(inputFloatsPerSet+outputFloatsInFile);
 			try {
 				while(toSkip>0) {
 					long skipped = fromFile.skip(toSkip);

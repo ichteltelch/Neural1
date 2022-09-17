@@ -41,7 +41,7 @@ public class FeedForward {
 				throw new IllegalArgumentException("Param set has wrong size");
 
 		}
-		public double eval(float[] input, float[] output){
+		public void eval(float[] input, float[] output){
 			a.clear();
 			//			as.clearLifeInterfaces(true);
 
@@ -49,10 +49,10 @@ public class FeedForward {
 			a.set(in, applyWhitener(input));
 			net.forward(ForwardPhase.TESTING, ps, ass, 0, null);
 			a.get(out, output);
-			lossLayer.forward(ForwardPhase.TRAINING, ps, ass, 0, null);
-			double lossVal =a.get(loss, 0);
-			//			System.out.println(lossVal);
-			return lossVal;
+//			lossLayer.forward(ForwardPhase.TRAINING, ps, ass, 0, null);
+//			double lossVal =a.get(loss, 0);
+//			//			System.out.println(lossVal);
+//			return lossVal;
 		}
 		private float[] applyWhitener(float[] input) {
 			if(inputWhitener==null)
