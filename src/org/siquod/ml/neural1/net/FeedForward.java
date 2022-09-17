@@ -109,7 +109,7 @@ public class FeedForward {
 					}
 					n+=bi;
 					bi=0;
-					net.initializeRun(ass, false);
+//					net.initializeRun(ass, false);
 				}
 
 
