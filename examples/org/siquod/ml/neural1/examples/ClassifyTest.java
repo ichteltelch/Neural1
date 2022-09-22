@@ -10,7 +10,10 @@ import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 
+import org.siquod.ml.neural1.modules.BatchNorm;
 import org.siquod.ml.neural1.modules.BatchReNorm;
+import org.siquod.ml.neural1.modules.BatchlessNorm;
+import org.siquod.ml.neural1.modules.Copy;
 import org.siquod.ml.neural1.modules.Dense;
 import org.siquod.ml.neural1.modules.Dropout;
 import org.siquod.ml.neural1.modules.InOutModule;
@@ -66,18 +69,33 @@ public class ClassifyTest {
 	InOutModule mod = new StackModule()
 			//			.addLayer(2, new BatchNorm())
 			//Add a dense layer, followed by a batch normalization layer, with 50 channels each
-			.addLayer(50, new Dense().regularizer(reg), new BatchReNorm())
+			.addLayer(50, new Dense().regularizer(reg), bn())
 			//Add a nonlinearity layer using the chosen activation function
 			.addLayer(50, new Nonlin(neuron))
 			//Add a dropout layer for better regularization
 			.addLayer(Dropout.factory(0.9))
 			//Add another dense and batch norm and nonlinearity layer, with 40 channels each
-			.addLayer(40, new Dense().regularizer(reg), new BatchReNorm(), new Nonlin(neuron))
+			.addLayer(40, new Dense().regularizer(reg), bn(), new Nonlin(neuron))
 			//And another dropout layer
 			.addLayer(Dropout.factory(.9))
 			//Add a final dense layer
 			.addFinalLayer(3, new Dense().regularizer(reg))
 			;
+
+
+
+	private InOutModule bn() {
+		int type = 
+				4
+				;
+		switch(type) {
+		case 1: return new Copy();
+		case 2: return new BatchNorm();
+		case 3: return new BatchReNorm();
+		case 4: return new BatchlessNorm(()->net.loss);
+		default: return null;
+		}
+	}
 	
 	//Another example of a network definition
 //	int k=3;
@@ -168,7 +186,7 @@ public class ClassifyTest {
 
 	private void run() {
 		while(true){
-			batchTrain(miniBatches?10:10);
+			batchTrain(miniBatches?100:100);
 			updateGraphics();
 			disp.repaint();
 		}

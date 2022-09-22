@@ -116,7 +116,7 @@ public class FirTextPrediction {
 	float[] outputs=new float[alphabet.length()];
 //	FeedForward net=new FeedForward(mod, new NllLoss(), inputs.length, outputs.length);
 	FeedForward net=new FeedForward(mod, new NllLoss(), new TensorFormat(depth, alphabet.length()), 
-			new TensorFormat(alphabet.length()));
+			new TensorFormat(alphabet.length())).init();
 
 	FeedForward.NaiveTrainer tr=net.getNaiveTrainer(batchSize, null).initSmallWeights(0.1);
 	FeedForward.Eval eval=tr.getEvaluator(false);

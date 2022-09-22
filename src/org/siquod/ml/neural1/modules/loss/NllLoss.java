@@ -46,7 +46,7 @@ public class NllLoss extends LossLayer{
 	public void allocate(InterfaceAllocator ia) {
 		in = ia.get("in");
 		target=ia.get("target", in.count);
-		loss=ia.get("loss", 1);
+		loss=ia.get("loss");
 		tf=in.tf;
 		while(tf.rank>2) {
 			tf = tf.flattenIndexAndNext(1);

@@ -42,7 +42,10 @@ public final class ActivationSet implements Cloneable{
 	public float get(Interface i, int index){
 		assert index>=0;
 		assert index<i.count;
-		return value[i.offset + index];
+		float ret = value[i.offset + index];
+		if(Double.isNaN(ret))
+			System.out.println();
+		return ret;
 	}
 
 	public void clear(Interface i){

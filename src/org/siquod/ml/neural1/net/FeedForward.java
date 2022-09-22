@@ -29,6 +29,9 @@ public class FeedForward {
 	int decisionCount, dropoutCount;
 	private InterfaceAllocator ba;
 	public class Eval{
+		{
+			init();
+		}
 		ParamSet ps;
 		ActivationBatch ass= new ActivationBatch(1, 1, ia, ba);
 		ActivationSeq as=ass.a[0];
@@ -67,8 +70,10 @@ public class FeedForward {
 					r.append(((Dense) n).showParams(ps));
 			return r.toString();
 		}
-
 		public double computeLoss(TrainingBatchCursor data, int bs) {
+			return computeLoss(data, bs, false);
+		}
+		public double computeLoss(TrainingBatchCursor data, int bs, boolean includeRegLoss) {
 			double[] inBuffer = new double[data.inputCount()];
 			double[] outBuffer = new double[data.outputCount()];
 			float[] inBufferFloat = new float[inBuffer.length];
@@ -104,7 +109,8 @@ public class FeedForward {
 					for(bi=0; bi<ass.length; ++bi) {
 						ActivationSeq as=ass.a[bi];
 						ActivationSet a=as.get(0);
-						double lossVal =a.get(loss, 0);
+						double lossVal = a.get(loss, 0);
+						if(includeRegLoss) lossVal += a.get(loss, 1);
 						lossSum+=lossVal;
 					}
 					n+=bi;
@@ -215,6 +221,9 @@ public class FeedForward {
 
 
 	public class NaiveTrainer implements Cloneable{
+		{
+			init();
+		}
 		ParamSet ps=new ParamSet(paramCount);
 		ParamSet grad=new ParamSet(paramCount);
 		//		Updater u=new Rprop();
@@ -339,6 +348,7 @@ public class FeedForward {
 				ActivationSet e = es.get(0);
 				e.clear();
 				e.add(loss, 0, imp[i]);
+				e.add(loss, 1, imp[i]);
 			}
 			for(int i=currentBatchSize; i<imp.length; ++i)
 				ess.a[i].get(0).clear();
@@ -397,8 +407,8 @@ public class FeedForward {
 		in=new Interface("input", inw);
 		out=new Interface("output", outw);
 		target=new Interface("target", outw);
-		loss=new Interface("loss", new TensorFormat(1));
-		init();
+		loss=new Interface("loss", new TensorFormat(2));
+//		init();
 	}
 	public FeedForward(InOutModule net, LossLayer lossLayer, int inw, int outw, int tw){
 		this(net, lossLayer, new TensorFormat(inw), new TensorFormat(outw), new TensorFormat(tw));
@@ -409,11 +419,15 @@ public class FeedForward {
 		in=new Interface("input", inw);
 		out=new Interface("output", outw);
 		target=new Interface("target", tw);
-		loss=new Interface("loss", new TensorFormat(1));
-		init();
+		loss=new Interface("loss", new TensorFormat(2));
+//		init();
 	}
 	InterfaceAllocator ia;
-	private void init() {
+	boolean inited = false;
+	public FeedForward init() {
+		if(inited)
+			return this;
+		inited = true;
 		ia=new InterfaceAllocator();
 		ba=new InterfaceAllocator();
 		ia.allocate(in);
@@ -442,6 +456,7 @@ public class FeedForward {
 		//		DependencyGraph gr=ds.createGraph(ia);
 		//		evalPlan=gr.makePlan(0, true, "test");
 		//		trainPlan=gr.makePlan(0, false, "training");
+		return this;
 	}
 	public NaiveTrainer getNaiveTrainer(int bs, Updater u) {
 		return new NaiveTrainer(bs, u);

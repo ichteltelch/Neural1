@@ -123,7 +123,7 @@ public class QITest {
 	float[] outputs=new float[3];
 	
 	//The whole network, comprising main module and loss layer
-	FeedForward net=new FeedForward(mod, new SoftMaxNllLoss(), inputs.length, outputs.length);
+	FeedForward net=new FeedForward(mod, new SoftMaxNllLoss(), inputs.length, outputs.length).init();
 
 	
 	//the data set to operate on
