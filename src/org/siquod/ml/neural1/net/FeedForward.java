@@ -1,6 +1,7 @@
 package org.siquod.ml.neural1.net;
 
 import java.util.Random;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.siquod.ml.data.TrainingBatchCursor;
@@ -33,7 +34,7 @@ public class FeedForward {
 			init();
 		}
 		ParamSet ps;
-		ActivationBatch ass= new ActivationBatch(1, 1, ia, ba);
+		public final ActivationBatch ass= new ActivationBatch(1, 1, ia, ba);
 		ActivationSeq as=ass.a[0];
 		ActivationSet a=as.get(0);
 		float[] whitenedInputs = new float[in.count];
@@ -74,6 +75,15 @@ public class FeedForward {
 			return computeLoss(data, bs, false);
 		}
 		public double computeLoss(TrainingBatchCursor data, int bs, boolean includeRegLoss) {
+			ActivationBatch ass = new ActivationBatch(bs, 1, ia, ba);
+			return computeLoss(data, ass, includeRegLoss, null);
+		}
+		public double computeLoss(TrainingBatchCursor data, int bs, boolean includeRegLoss, Consumer<? super ActivationBatch> afterBatch) {
+			ActivationBatch ass = new ActivationBatch(bs, 1, ia, ba);
+			return computeLoss(data, ass, includeRegLoss, afterBatch);
+		}
+		public double computeLoss(TrainingBatchCursor data, ActivationBatch ass, boolean includeRegLoss, Consumer<? super ActivationBatch> afterBatch) {
+			int bs=ass.a.length;
 			double[] inBuffer = new double[data.inputCount()];
 			double[] outBuffer = new double[data.outputCount()];
 			float[] inBufferFloat = new float[inBuffer.length];
@@ -81,7 +91,6 @@ public class FeedForward {
 			data.reset();
 			double lossSum=0;
 			int n=0;
-			ActivationBatch ass = new ActivationBatch(bs, 1, ia, ba);
 			int bi = 0;
 			net.initializeRun(ass, false);
 
@@ -115,6 +124,8 @@ public class FeedForward {
 					}
 					n+=bi;
 					bi=0;
+					if(afterBatch!=null)
+						afterBatch.accept(ass);
 //					net.initializeRun(ass, false);
 				}
 
@@ -376,11 +387,7 @@ public class FeedForward {
 			return ret;
 		}
 		public NaiveTrainer initSmallWeights(double d) {
-			for(int i=0; i<ps.size(); ++i)
-				ps.set(i, d*(Math.random()-0.5));
-			net.initParams(ps);
-			lossLayer.initParams(ps);
-			return this;
+			return initSmallWeights(d, new Random());
 		}
 		public NaiveTrainer initSmallWeights(double d, Random r) {
 			for(int i=0; i<ps.size(); ++i)

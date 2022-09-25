@@ -14,8 +14,8 @@ public abstract class Regularizer {
 			float globalRegularization)
 	{
 		float eff = globalRegularization*strength;
-		for(int i=0; i<n1; ++i){
-			regularize(weights, gradients, o + i*s1, n2, s2, eff);
+		for(int i=0; i<n2; ++i){
+			regularize(weights, gradients, o + i*s2, n1, s1, eff);
 		}
 	}
 	public abstract void regularize(ParamSet weights, ParamSet gradients, int o, int n, int s, float eff) ;

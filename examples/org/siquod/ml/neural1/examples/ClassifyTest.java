@@ -12,7 +12,8 @@ import javax.swing.JLabel;
 
 import org.siquod.ml.neural1.modules.BatchNorm;
 import org.siquod.ml.neural1.modules.BatchReNorm;
-import org.siquod.ml.neural1.modules.BatchlessNorm;
+import org.siquod.ml.neural1.modules.BatchlessNormLog;
+import org.siquod.ml.neural1.modules.BatchlessNormInv;
 import org.siquod.ml.neural1.modules.Copy;
 import org.siquod.ml.neural1.modules.Dense;
 import org.siquod.ml.neural1.modules.Dropout;
@@ -76,8 +77,20 @@ public class ClassifyTest {
 			.addLayer(Dropout.factory(0.9))
 			//Add another dense and batch norm and nonlinearity layer, with 40 channels each
 			.addLayer(40, new Dense().regularizer(reg), bn(), new Nonlin(neuron))
-			//And another dropout layer
-			.addLayer(Dropout.factory(.9))
+			//Add a dropout layer for better regularization
+			.addLayer(Dropout.factory(0.9))
+			//Add another dense and batch norm and nonlinearity layer, with 40 channels each
+			.addLayer(40, new Dense().regularizer(reg), bn(), new Nonlin(neuron))
+			//Add a dropout layer for better regularization
+			.addLayer(Dropout.factory(0.9))
+//			//Add another dense and batch norm and nonlinearity layer, with 40 channels each
+//			.addLayer(40, new Dense().regularizer(reg), bn(), new Nonlin(neuron))
+//			//Add a dropout layer for better regularization
+//			.addLayer(Dropout.factory(0.9))
+//			//Add another dense and batch norm and nonlinearity layer, with 40 channels each
+//			.addLayer(40, new Dense().regularizer(reg), bn(), new Nonlin(neuron))
+//			//And another dropout layer
+//			.addLayer(Dropout.factory(0.9))
 			//Add a final dense layer
 			.addFinalLayer(3, new Dense().regularizer(reg))
 			;
@@ -86,13 +99,14 @@ public class ClassifyTest {
 
 	private InOutModule bn() {
 		int type = 
-				4
+				5
 				;
 		switch(type) {
 		case 1: return new Copy();
 		case 2: return new BatchNorm();
 		case 3: return new BatchReNorm();
-		case 4: return new BatchlessNorm(()->net.loss);
+		case 4: return new BatchlessNormLog(()->net.loss);
+		case 5: return new BatchlessNormInv(()->net.loss);
 		default: return null;
 		}
 	}
@@ -147,7 +161,7 @@ public class ClassifyTest {
 	boolean miniBatches=true;
 
 	//the batch size
-	int batchSize=16;
+	int batchSize=4;
 
 
 

@@ -16,7 +16,7 @@ import org.siquod.ml.neural1.ParamBlock;
 import org.siquod.ml.neural1.ParamBlocks;
 import org.siquod.ml.neural1.ParamSet;
 
-public class BatchNorm implements InOutScaleBiasModule {
+public class BatchNorm extends BatchNormoid{
 
 	private static final float epsilon = 1e-10f;
 	private Interface in;
@@ -30,7 +30,7 @@ public class BatchNorm implements InOutScaleBiasModule {
 	public BatchNorm() {
 		this(true);
 	}
-	ParamBlock add, mult, runningMean, runningVar;
+	ParamBlock add, mult;
 
 	@Override
 	public void allocate(InterfaceAllocator ia) {
@@ -53,7 +53,7 @@ public class BatchNorm implements InOutScaleBiasModule {
 		if(hasAdd) add = ia.allocate(new ParamBlock("add", in.count));
 		mult = ia.allocate(new ParamBlock("mult", in.count));
 		runningMean = ia.allocate(new ParamBlock("mean", in.count));
-		runningVar = ia.allocate(new ParamBlock("var", in.count));
+		runningSdev = ia.allocate(new ParamBlock("sdev", in.count));
 	}
 
 	@Override
@@ -61,7 +61,7 @@ public class BatchNorm implements InOutScaleBiasModule {
 		if(hasAdd) add = ps.get("add", in.count);
 		mult = ps.get("mult", in.count);		
 		runningMean = ps.get("mean", in.count);
-		runningVar = ps.get("var", in.count);		
+		runningSdev = ps.get("sdev", in.count);		
 	}
 
 	@Override
@@ -70,7 +70,7 @@ public class BatchNorm implements InOutScaleBiasModule {
 		if(hasAdd) ret.add(add);
 		ret.add(mult);
 		ret.add(runningMean);
-		ret.add(runningVar);
+		ret.add(runningSdev);
 		return ret;
 	}
 
@@ -106,10 +106,10 @@ public class BatchNorm implements InOutScaleBiasModule {
 
 					float addVal=hasAdd?params.get(add, i):0;
 					float multVal=params.get(mult, i);
-//					if(i==0) {
-//						System.out.println("mean = "+mean+", var = "+var);
-//						System.out.println("add = "+addVal+", mult = "+multVal);
-//					}
+					//					if(i==0) {
+					//						System.out.println("mean = "+mean+", var = "+var);
+					//						System.out.println("add = "+addVal+", mult = "+multVal);
+					//					}
 					//					System.out.println(" (x - "+mean+") * "+scal+" * "+multVal+" + "+addVal);
 					for(ActivationSeq b: as) {
 						if(b==null)
@@ -124,21 +124,33 @@ public class BatchNorm implements InOutScaleBiasModule {
 				for(ActivationSeq b: as) {
 					if(b==null)
 						continue;
+					++instanceCount;
+
 					for(int i=0; i<in.count; ++i) {
 						ActivationSet a = b.get(t);
 						float mean = params.get(this.runningMean, i);
-						float var = params.get(this.runningVar, i);
+						float sdev = params.get(this.runningSdev, i);
+						float a_in = a.get(in, i);
+						if(finalizationMode==FinalizationMode.MEANS) {
+							params.add(this.runningMean, i, a_in);
+						}else if(finalizationMode==FinalizationMode.STANDARD_DEVIATIONS) {
+							double dev = a_in - mean;
+							params.add(this.runningSdev, i, dev*dev);
+						}
+
 						float addVal=hasAdd?params.get(add, i):0;
 						float multVal=params.get(mult, i);
-//						if(i==0) {
-//							System.out.println("mean = "+mean+", var = "+var);
-//							System.out.println("add = "+addVal+", mult = "+multVal);
-//						}
+						//						if(i==0) {
+						//							System.out.println("mean = "+mean+", var = "+var);
+						//							System.out.println("add = "+addVal+", mult = "+multVal);
+						//						}
 						//						System.out.println(" (x + "+mShift+") * "+vScale+" * "+multVal+" + "+addVal);
 
-						float scal = 1/(float)Math.sqrt(var+epsilon);
 
-						float d = (a.get(in, i) - mean)*scal;
+
+						float scal = 1/(sdev+epsilon);
+
+						float d = (a_in - mean)*scal;
 						float v = d*multVal + addVal;
 						a.add(out, i, v);
 					}
@@ -247,8 +259,8 @@ public class BatchNorm implements InOutScaleBiasModule {
 				if(hasAdd)
 					gradients.add(add, i, addErr);
 				gradients.add(mult, i, multErr);
-//				gradients.set(runningMean, i, 0);
-//				gradients.add(runningVar, i, 0);
+				//				gradients.set(runningMean, i, 0);
+				//				gradients.add(runningVar, i, 0);
 			}
 		}else {
 			//TODO
@@ -267,7 +279,7 @@ public class BatchNorm implements InOutScaleBiasModule {
 				p.set(add, i, 0);
 			p.set(mult, i, 1);
 			p.set(runningMean, i, 0);
-			p.set(runningVar, i, 1);
+			p.set(runningSdev, i, 1);
 		}
 	}
 
@@ -301,21 +313,21 @@ public class BatchNorm implements InOutScaleBiasModule {
 		float owt=owt_fun.apply(age++);
 		System.out.print("");
 		for(int i=0; i<in.count; ++i) {
-			float smean, svar, swt;
+			float smean, ssdev, swt;
 			smean=params.get(runningMean, i)*owt;
-			svar=params.get(runningVar, i)*owt;
+			ssdev=params.get(runningSdev, i)*owt;
 			swt=owt;
 			for(int ts=0; ts<weight.length; ++ts) {
 				int t = ts + tMin;
 				float df=weight[ts];
 				swt+=df;
 				smean += df*stat.get(t).get(mean, i);
-				svar += df*stat.get(t).get(var, i);
+				ssdev += df*Math.sqrt(stat.get(t).get(var, i));
 			}
 			float mv = smean/swt;
-			float vv = svar/swt;
+			float vv = ssdev/swt;
 			params.set(runningMean, i, mv);
-			params.set(runningVar, i, vv);
+			params.set(runningSdev, i, vv);
 		}
 	}
 	public ParamBlock getAdd() {
@@ -330,11 +342,42 @@ public class BatchNorm implements InOutScaleBiasModule {
 	public ParamBlock getRunningMean() {
 		return runningMean;
 	}
-	public ParamBlock getRunningVar() {
-		return runningVar;
+	public ParamBlock getRunningSdev() {
+		return runningSdev;
 	}
 	@Override
 	public ParamBlock getScale() {
 		return mult;
+	}
+	@Override
+	public double distributionMismatch(ActivationBatch as, ParamSet params, int t) {
+		int startI = 0;
+		int endI = in.count;
+		int startA = 0;
+		int endA = as.length;
+		double ret = 0;
+		for(int bi = startA; bi<endA; ++bi) {
+			double lossContrib = 0;
+			ActivationSeq b = as.a[bi];
+			if(b==null)
+				continue;
+			ActivationSet a = b.get(t);
+			for(int i=startI; i<endI; ++i) {
+				float mean = params.get(this.runningMean, i);
+				float sdev = params.get(this.runningSdev, i);
+
+				float scal = 1/sdev;
+				double entropy = 0.5*(1+Math.log(sdev*sdev));
+
+				int index = i;
+				float activation = a.get(in, index);
+				float normalized = (activation - mean)*scal;
+				lossContrib += 0.5*normalized*normalized + Math.log(sdev) -entropy;
+
+
+			}
+			ret += lossContrib;	
+		}
+		return ret;
 	}
 }

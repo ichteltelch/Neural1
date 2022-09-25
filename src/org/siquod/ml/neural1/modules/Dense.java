@@ -29,8 +29,8 @@ public class Dense implements InOutBiasModule{
 
 	Interface in;
 	Interface out;
-	ParamBlock weights;
-	ParamBlock bias;
+	public ParamBlock weights;
+	public ParamBlock bias;
 	ParamBlock[] coordinateBias;
 	int[] shift;
 	int[] posi;
@@ -206,7 +206,8 @@ public class Dense implements InOutBiasModule{
 					}
 					for(int o=endO-1; o>=startO; --o){
 						int w = o + i * outcount;
-						oa.add(out, o, input * params.get(weights, w));
+						float weight = params.get(weights, w);
+						oa.add(out, o, input * weight);
 					}
 				}
 			}
@@ -217,7 +218,8 @@ public class Dense implements InOutBiasModule{
 			//		}
 			if(useBias){
 				for(int o=endO-1; o>=startO; --o){
-					oa.add(out, o, params.get(bias, o));
+					float b = params.get(bias, o);
+					oa.add(out, o, b);
 				}
 			}
 			for(int i=0; i<coordinateBias.length; ++i) {
@@ -590,6 +592,9 @@ public class Dense implements InOutBiasModule{
 		if(bias!=null && !Double.isNaN(biasInit))
 			for(int i=0; i<bias.count; ++i)
 				p.set(bias, i, biasInit);
+		double factor = Math.sqrt(2d/(in.channels() + out.channels()));
+		for(int i=0; i<weights.count; ++i)
+			p.set(weights, i, p.get(weights, i)*factor);
 	}
 	public ParamBlock getBias() {
 		return bias;

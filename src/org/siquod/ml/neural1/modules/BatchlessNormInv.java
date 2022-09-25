@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.siquod.ml.neural1.ActivationBatch;
 import org.siquod.ml.neural1.ActivationSeq;
@@ -20,40 +20,36 @@ import org.siquod.ml.neural1.ParamBlocks;
 import org.siquod.ml.neural1.ParamSet;
 import org.siquod.ml.neural1.TensorFormat;
 
-public class BatchReNorm extends BatchNormoid{
+public class BatchlessNormInv extends AbstractBatchNorm{
 
-	private static final float epsilon = 1e-10f;
 	private Interface in;
 	private Interface out;
-	private Interface mean, sdev;
-	ParamBlock add, mult;
+	private Interface loss;
+	ParamBlock mean, inv_sd, add, mult;
 	int age=0;
 	boolean hasAdd=true;
 	boolean broadcast;
 	int par=1;
 	TensorFormat tf;
+	Supplier<? extends Interface> lossSupplier;
+	double lr = .1;
 
-	Function<Integer, Float> rmaxSchedule=rmaxSchedule(100);
-	Function<Integer, Float> dmaxSchedule=dmaxSchedule(100);
 
-	static Function<Integer, Float> rmaxSchedule(int scal){
-		return n -> n < scal ? 1 : n <8*scal ?  1+2*(n-scal)/7f:3;
-	}	
-	static Function<Integer, Float> dmaxSchedule(int scal){
-		return n -> n < scal ? 0 : n <5*scal ?  5*(n-scal)/4f:5;
-	}
-	public BatchReNorm(boolean hasAdd, boolean broadcast) {
+	public BatchlessNormInv(boolean hasAdd, boolean broadcast, Supplier<? extends Interface> lossSupplier) {
 		this.hasAdd=hasAdd;
 		this.broadcast=broadcast;
+		this.lossSupplier = lossSupplier;
 	}
-	public BatchReNorm() {
-		this(true, true);
+	public BatchlessNormInv(Supplier<? extends Interface> lossSupplier) {
+		this(true, true, lossSupplier);
 	}
 
 	@Override
 	public void allocate(InterfaceAllocator ia) {
 		in = ia.get("in");
 		out = ia.get("out");
+		loss = lossSupplier.get();
+		lossSupplier=null;
 		if(!in.tf.equals(out.tf))
 			throw new IllegalArgumentException("input and output layer must be of the same size");
 		if(broadcast) {
@@ -64,20 +60,12 @@ public class BatchReNorm extends BatchNormoid{
 	}
 
 	@Override
-	public void allocateStatistics(InterfaceAllocator ia) {
-		ia.push(null);
-		int ch = tf.channels();
-		mean = ia.allocate(new Interface("mean", ch, null));
-		sdev = ia.allocate(new Interface("sdev", ch, null));
-		ia.pop();
-	}
-	@Override
 	public void allocate(ParamAllocator ia) {
 		int ch = tf.channels();
 		if(hasAdd) add = ia.allocate(new ParamBlock("add", ch));
 		mult = ia.allocate(new ParamBlock("mult", ch));
-		runningMean = ia.allocate(new ParamBlock("mean", ch));
-		runningSdev = ia.allocate(new ParamBlock("sdev", ch));
+		mean = ia.allocate(new ParamBlock("mean", ch));
+		inv_sd = ia.allocate(new ParamBlock("inv_sdev", ch));
 	}
 
 	@Override
@@ -85,8 +73,8 @@ public class BatchReNorm extends BatchNormoid{
 		int ch = tf.channels();
 		if(hasAdd) add = ps.get("add", ch);
 		mult = ps.get("mult", ch);		
-		runningMean = ps.get("mean", ch);
-		runningSdev = ps.get("sdev", ch);		
+		mean = ps.get("mean", ch);
+		inv_sd = ps.get("inv_sd", ch);		
 	}
 
 	@Override
@@ -94,28 +82,27 @@ public class BatchReNorm extends BatchNormoid{
 		ParamBlocks ret = new ParamBlocks("BatchReNorm");
 		if(hasAdd) ret.add(add);
 		ret.add(mult);
-		ret.add(runningMean);
-		ret.add(runningSdev);
+		ret.add(mean);
+		ret.add(inv_sd);
 		return ret;
 	}
 
 	@Override
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst) {
-		ActivationSet bparm = as.batchParams.get(t);
 		if(inst==null) {
 			int ch = tf.channels();
 			if(training != ForwardPhase.TESTING) {
 
-				float dmax=dmaxSchedule.apply(age);
-				float rmax=rmaxSchedule.apply(age);
 
 				int taskCount = Math.min(par*4, ch);
 				if(par==1 || taskCount==1) {
+					int startA = 0;
+					int endA = as.length;
 					int startI = 0;
 					int endI = ch;
 					int startBri = 0;
 					int endBri = tf.dims[0];
-					forwardSlice(params, as, t, bparm, startI, endI, startBri, endBri, dmax, rmax);
+					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, false);
 				}else {
 					AtomicInteger done = new AtomicInteger();
 					int neededWorkers = Math.min(par, taskCount);
@@ -127,11 +114,13 @@ public class BatchReNorm extends BatchNormoid{
 									int task = done.getAndAdd(1);
 									if(task>=taskCount)
 										return;
+									int startA = 0;
+									int endA = as.length;
 									int startI = task * ch / taskCount;
 									int endI = (task+1) * ch / taskCount;
 									int startBri = 0;
 									int endBri = tf.dims[0];
-									forwardSlice(params, as, t, bparm, startI, endI, startBri, endBri, dmax, rmax);
+									forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, false);
 								}
 							}));
 						}
@@ -155,7 +144,7 @@ public class BatchReNorm extends BatchNormoid{
 					int startBri = 0;
 					int endBri = tf.dims[0];
 
-					forwardInferenceSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true);
 				}else{
 					AtomicInteger done = new AtomicInteger();
 					int workersNeeded = Math.min(par, maxPar);
@@ -174,7 +163,7 @@ public class BatchReNorm extends BatchNormoid{
 										int endI = ch;
 										int startBri = 0;
 										int endBri = tf.dims[0];
-										forwardInferenceSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true);
 									}
 								}));
 							}
@@ -191,7 +180,7 @@ public class BatchReNorm extends BatchNormoid{
 										int endA = as.length;
 										int startBri = 0;
 										int endBri = tf.dims[0];
-										forwardInferenceSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true);
 									}
 								}));
 							}
@@ -213,19 +202,18 @@ public class BatchReNorm extends BatchNormoid{
 		}
 
 	}
-	private void forwardInferenceSlice(ParamSet params, ActivationBatch as, int t, 
-			int startI, int endI, int startA, int endA, int startBri, int endBri) {
-				
+	private void forwardSlice(ParamSet params, ActivationBatch as, int t, 
+			int startI, int endI, int startA, int endA, int startBri, int endBri,
+			boolean computeLoss) {
 		for(int bi = startA; bi<endA; ++bi) {
-			instanceCount ++;
+			double lossContrib = 0;
 			ActivationSeq b = as.a[bi];
 			if(b==null)
 				continue;
+			ActivationSet a = b.get(t);
 			for(int i=startI; i<endI; ++i) {
-				ActivationSet a = b.get(t);
-				float mean = params.get(this.runningMean, i);
-				float sdev = params.get(this.runningSdev, i);
-
+				float mean = params.get(this.mean, i);
+				float inv_sdev = params.get(this.inv_sd, i);
 				float addVal=hasAdd?params.get(add, i):0;
 				float multVal=params.get(mult, i);
 				//						if(i==0) {
@@ -234,87 +222,32 @@ public class BatchReNorm extends BatchNormoid{
 				//						}
 				//						System.out.println(" (x + "+mShift+") * "+vScale+" * "+multVal+" + "+addVal);
 
-				float scal = 1/sdev;
+				float scal = inv_sdev;
 				for(int bri = startBri; bri<endBri; bri++) {
 					int index = tf.index(bri, i);
-					float a_in = a.get(in, index);
-					float d = (a_in - mean)*scal;
-					if(finalizationMode==FinalizationMode.MEANS) {
-						params.add(this.runningMean, i, a_in);
-					}else if(finalizationMode==FinalizationMode.STANDARD_DEVIATIONS) {
-						double dev = a_in - mean;
-						params.add(this.runningSdev, i, dev*dev);
-					}
-					float v = d*multVal + addVal;
-					a.add(out, index, v);
+					float activation = a.get(in, index);
+					float normalized = (activation - mean)*scal;
+					if(computeLoss)
+						lossContrib += 0.5*normalized*normalized - Math.log(Math.abs(inv_sdev));
+					float denormalized = normalized*multVal + addVal;
+					a.add(out, index, denormalized);
 				}
+				
+
+			}
+			if(computeLoss) {
+			lossContrib *= lr;
+			synchronized (loss) {
+				a.add(loss, 1, (float)lossContrib);
+			}
 			}
 		}
 	}
-	private void forwardSlice(ParamSet params, ActivationBatch as, int t, ActivationSet bparm, int startI, int endI,
-			int startBri, int endBri, float dmax, float rmax) {
-		for(int i=startI; i<endI; ++i) {
-			float mean=0;
-			int count=0;
-			for(ActivationSeq b: as) {
-				if(b==null)
-					continue;
-				for(int bri = startBri; bri<endBri; ++bri) {
-					int index = tf.index(bri, i);
-					mean+=b.get(t).get(in, index);
-					count++;
-				}
-			}
-			mean/=count;
-			float var = 0;
-			for(ActivationSeq b: as) {
-				if(b==null)
-					continue;
-				for(int bri = startBri; bri<endBri; ++bri) {
-					int index = tf.index(bri, i);
 
-					float d = b.get(t).get(in, index) - mean;
-					var += d*d;
-				}
-			}
-			var/=count;
-			float sdev=(float) Math.sqrt(var+epsilon);
-			float scal = 1/sdev;
-			float rmean=params.get(runningMean, i);
-			float rsdev=params.get(runningSdev, i);
-
-			float r=Math.min(rmax, Math.max(1/rmax, sdev/rsdev));
-			float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
-			{
-				bparm.set(this.mean, i, mean);
-				bparm.set(this.sdev, i, sdev);
-			}
-
-			float addVal=hasAdd?params.get(add, i):0;
-			float multVal=params.get(mult, i);
-			//					if(i==0) {
-			//						System.out.println("mean = "+mean+", var = "+var);
-			//						System.out.println("add = "+addVal+", mult = "+multVal);
-			//					}
-			//					System.out.println(" (x - "+mean+") * "+scal+" * "+multVal+" + "+addVal);
-			for(ActivationSeq b: as) {
-				if(b==null)
-					continue;
-				ActivationSet a = b.get(t);
-				for(int bri = startBri; bri<endBri; ++bri) {
-					int index = tf.index(bri, i);
-					float dv = (a.get(in, index) - mean)*scal*r+d;
-					float v = dv*multVal + addVal;
-					a.add(out, index, v);
-				}
-			}
-		}
-	}
 
 	@Override
 	public void backprop(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, int t, int[] inst) {
 		//		float dmax=dmaxSchedule.apply(age);
-		float rmax=rmaxSchedule.apply(age);
 
 		if(inst==null) {			
 			int ch = tf.channels();
@@ -324,8 +257,10 @@ public class BatchReNorm extends BatchNormoid{
 				int endI = ch;
 				int startBri = 0;
 				int endBri = tf.dims[0];
+				int startA = 0;
+				int endA = as.length;
 
-				backpropSlice(params, as, errors, t, rmax, startI, endI, startBri, endBri);
+				backpropSlice(params, as, errors, t, startA, endA, startI, endI, startBri, endBri);
 			}else {
 				AtomicInteger done = new AtomicInteger();
 				int workersNeeded = Math.min(par, taskCount);
@@ -341,8 +276,10 @@ public class BatchReNorm extends BatchNormoid{
 								int endI = (task+1) * ch / taskCount;
 								int startBri = 0;
 								int endBri = tf.dims[0];
+								int startA = 0;
+								int endA = as.length;
 
-								backpropSlice(params, as, errors, t, rmax, startI, endI, startBri, endBri);
+								backpropSlice(params, as, errors, t, startA, endA, startI, endI, startBri, endBri);
 							}
 						}));
 					}
@@ -360,89 +297,51 @@ public class BatchReNorm extends BatchNormoid{
 			throw new UnsupportedOperationException("Not implemented");
 		}
 	}
-	private void backpropSlice(ParamSet params, ActivationBatch as, ActivationBatch errors, int t, float rmax,
+	private void backpropSlice(ParamSet params, ActivationBatch as, ActivationBatch errors, int t,
+			int startA, int endA, 
 			int startI, int endI,
 			int startBri, int endBri) {
-		for(int i=startI; i<endI; ++i) {
+		
+		
+		for(int bi = startA; bi<endA; ++bi) {
+			ActivationSeq asbi = as.a[bi];
+			if(asbi==null)
+				continue;
+			ActivationSeq esbi = errors.a[bi];
+			if(esbi==null)
+				continue;
+//			ActivationSet a = asbi.get(t);
+			ActivationSet e = esbi.get(t);
+//			double ðloss_lr = e.get(loss, 0)*lr;
+			for(int i=startI; i<endI; ++i) {
+/**
+ * ðin_actiavtion = ðout_activation · exp(-log_sd)
+ */
+				
+//				float mean = params.get(this.mean, i);
+				float inv_sdev = params.get(this.inv_sd, i);
+//				float addVal=hasAdd?params.get(add, i):0;
+				float multVal=params.get(mult, i);
 
-			float mean = as.batchParams.get(t).get(this.mean, i);
-			float sdev = as.batchParams.get(t).get(this.sdev, i);
-			float scal = 1/sdev;
-			//				float rmean=params.get(runningMean, i);
-			float rsdev=params.get(runningSdev, i);
-
-			float r=Math.min(rmax, Math.max(1/rmax, sdev/rsdev));
-			//				float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
-
-			//				float addVal=params.get(add, i);
-			float multVal=params.get(mult, i);
-			int count=0;
-			float scalErr=0;
-
-			for(int b=0; b<as.length; ++b) {
-				ActivationSeq es=errors.a[b];
-				if(es==null)
-					continue;
-				for(int bri = startBri; bri<endBri; ++bri) {
+				float scal = inv_sdev;
+				for(int bri = startBri; bri<endBri; bri++) {
 					int index = tf.index(bri, i);
-
-					count++;
-					ActivationSet a = as.a[b].get(t);
-					ActivationSet e = es.get(t);
-					float me=e.get(out, index)*multVal;
-					float scalInp = (a.get(in, index)-mean);
-					scalErr+=me*scalInp;
+//					float in_activation = a.get(in, index);
+					float ðout_activation = e.get(out, index) * multVal;
+					float ðin_activation = ðout_activation * scal;
+					e.add(in, index, ðin_activation);
 				}
-
+				
 
 			}
-			//			float scal = 1/Math.sqrt(var+epsilon);
-			//			ð var = -0.5*(var+epsilon)^1.5 * ð scal;
-			float varErr = scalErr * -0.5f / (sdev*sdev*sdev);
-			varErr/=count;
-			float meanErr=0;
-			for(int b=0; b<as.length; ++b) {
-				ActivationSeq es=errors.a[b];
-				if(es==null)
-					continue;
-				ActivationSet a = as.a[b].get(t);
-				ActivationSet e = es.get(t);
-				for(int bri = startBri; bri<endBri; ++bri) {
-					int index = tf.index(bri, i);
 
-					float scalInp = a.get(in, index)-mean;
-					float me=e.get(out, index)*multVal*r;
-					me *= scal;
-					me += 2 * scalInp * varErr;
-					meanErr += -me;
-				}
-			}
-			meanErr/=count;
-			for(int b=0; b<as.length; ++b) {
-				ActivationSeq es=errors.a[b];
-				if(es==null)
-					continue;
-				ActivationSet a = as.a[b].get(t);
-				ActivationSet e = es.get(t);
-				for(int bri = startBri; bri<endBri; ++bri) {
-					int index = tf.index(bri, i);
-
-					float scalInp = a.get(in, index)-mean;
-					float me=e.get(out, index)*multVal*r;
-					me *= scal;
-					me += 2 * scalInp * varErr;
-					me += meanErr;
-					e.add(in, index, me);
-				}
-			}
 		}
+
 	}
 
 	@Override
 	public void gradients(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, ParamSet gradients,
 			int t, int[] inst) {
-		float dmax=dmaxSchedule.apply(age);
-		float rmax=rmaxSchedule.apply(age);
 		if(inst==null) {
 			int ch = tf.channels();
 			int taskCount = Math.min(par*4, ch);
@@ -452,7 +351,7 @@ public class BatchReNorm extends BatchNormoid{
 				int startBri = 0;
 				int endBri = tf.dims[0];
 
-				gradientSlice(params, as, errors, gradients, t, dmax, rmax, startI, endI, startBri, endBri);
+				gradientSlice(params, as, errors, gradients, t, startI, endI, startBri, endBri);
 			}else {
 				AtomicInteger done = new AtomicInteger();
 				int workersNeeded = Math.min(par, taskCount);
@@ -469,7 +368,7 @@ public class BatchReNorm extends BatchNormoid{
 								int startBri = 0;
 								int endBri = tf.dims[0];
 
-								gradientSlice(params, as, errors, gradients, t, dmax, rmax, startI, endI, startBri, endBri);
+								gradientSlice(params, as, errors, gradients, t, startI, endI, startBri, endBri);
 							}
 						}));
 					}
@@ -488,23 +387,21 @@ public class BatchReNorm extends BatchNormoid{
 		}	
 	}
 	private void gradientSlice(ParamSet params, ActivationBatch as, ActivationBatch errors, ParamSet gradients, int t,
-			float dmax, float rmax, int startI, int endI,
+			int startI, int endI,
 			int startBri, int endBri) {
-		ActivationSet bp = as.batchParams.get(t);
 		for(int i=startI; i<endI; ++i) {
-			float mean = bp.get(this.mean, i);
-			float sdev = bp.get(this.sdev, i);
-			float scal = 1/sdev;
-			float rmean=params.get(runningMean, i);
-			float rsdev=params.get(runningSdev, i);
-
-			float r=Math.min(rmax, Math.max(1/rmax, sdev/rsdev));
-			float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
+			float mean = params.get(this.mean, i);
+			float inv_sdev = params.get(this.inv_sd, i);
+//			float mult=params.get(this.mult, i);
+//			float add=this.hasAdd?params.get(this.add, i):0;
+			float scal = inv_sdev;
 
 			//				int count=0;
 
-			float addErr=0;
-			float multErr=0;
+			double ðadd=0;
+			double ðmult=0;
+			double ðmean=0;
+			double ðlog_sdev=0;
 			for(int b=0; b<as.length; ++b) {
 				ActivationSeq es=errors.a[b];
 				if(es==null)
@@ -512,20 +409,35 @@ public class BatchReNorm extends BatchNormoid{
 				//					count++;
 				ActivationSet a = as.a[b].get(t);
 				ActivationSet e = es.get(t);
+				double ðloss_lr = e.get(loss, 1)*lr;
+				/**
+				 * ðlog_sd = learn_rate_multiplier · ðloss · (1 - 2·(in_activation - mean)²·exp(-log_sd)²)
+				 * ðmean = learn_rate_multiplier · ðloss · (- 2·(in_activation - mean) · exp(-log_sd)² )
+				 */
+
 				for(int bri = startBri; bri<endBri; ++bri) {
 					int index = tf.index(bri, i);
 
-					float oe=e.get(out, index);
-					addErr += oe;
-					float reparin = (a.get(in, index)-mean)*scal*r+d;
-					multErr += reparin * oe;
+					float ðout=e.get(out, index);
+					ðadd += ðout;
+					float in_activation = a.get(in, index);
+					float shifted = in_activation - mean;
+					float normalized = shifted*scal;
+					ðmult += normalized * ðout;
+					
+					ðmean += ðloss_lr * (-normalized*scal);
+					ðlog_sdev += ðloss_lr * (1 - normalized*normalized);
 				}
 
 
 			}
 			if(hasAdd)
-				gradients.add(add, i, addErr);
-			gradients.add(mult, i, multErr);
+				gradients.add(this.add, i, ðadd);
+			gradients.add(this.mult, i, ðmult);
+			gradients.add(this.mean, i, ðmean);
+			// inv_sd = exp(-log_sd)
+			double ðinv_sdev = ðlog_sdev * -inv_sdev;
+			gradients.add(this.inv_sd, i, ðinv_sdev);
 			//				gradients.set(runningMean, i, 0);
 			//				gradients.add(runningVar, i, 0);
 		}
@@ -542,8 +454,8 @@ public class BatchReNorm extends BatchNormoid{
 			if(hasAdd)
 				p.set(add, i, 0);
 			p.set(mult, i, 1);
-			p.set(runningMean, i, 0);
-			p.set(runningSdev, i, 1);
+			p.set(mean, i, 0);
+			p.set(inv_sd, i, 1);
 		}
 	}
 
@@ -571,39 +483,16 @@ public class BatchReNorm extends BatchNormoid{
 	public int[] shift() {
 		return null;
 	}
-	@Override
-	public void updateStatistics(ActivationSeq stat, ParamSet params, Function<Integer, Float> owt_fun, float[] weight, int tMin) {
-		float owt=owt_fun.apply(age++);
-		int ch = tf.channels();
-		for(int i=0; i<ch; ++i) {
-			float smean, ssdev, swt;
-			smean=params.get(runningMean, i)*owt;
-			ssdev=params.get(runningSdev, i)*owt;
-			swt=owt;
-			for(int ts=0; ts<weight.length; ++ts) {
-				int t = ts + tMin;
-				float df=weight[ts];
-				swt+=df;
-				smean += df*stat.get(t).get(mean, i);
-				ssdev += df*stat.get(t).get(sdev, i);
-			}
-			float mv = smean/swt;
-			float vv = ssdev/swt;
-			params.set(runningMean, i, mv);
-			params.set(runningSdev, i, vv);
-		}
-	}
+
 	public ParamBlock getAdd() {
 		return add;
 	}
 	public ParamBlock getMult() {
 		return mult;
 	}
-	public ParamBlock getRunningMean() {
-		return runningMean;
-	}
-	public ParamBlock getRunningVar() {
-		return runningSdev;
+	public BatchlessNormInv learn_rate_multiplier(double lr) {
+		this.lr=lr;
+		return this;
 	}
 	@Override
 	public ParamBlock getBias() {
@@ -613,18 +502,29 @@ public class BatchReNorm extends BatchNormoid{
 	public ParamBlock getScale() {
 		return mult;
 	}
-	public BatchReNorm parallel(int threads) {
+	public BatchlessNormInv parallel(int threads) {
 		if(threads<1)
 			throw new IllegalArgumentException();
 		par = threads;
 		return this;
 	}
+	
+	@Override
+	public ParamBlock sigmaSotrage() {
+		return inv_sd;
+	}
+	@Override
+	public ParamBlock meanStorage() {
+		return mean;
+	}
 	@Override
 	public double distributionMismatch(ActivationBatch as, ParamSet params, int t) {
 		int startI = 0;
-		int endI = in.count;
+		int endI = tf.channels();
 		int startA = 0;
 		int endA = as.length;
+		int startBri = 0;
+		int endBri = tf.dims[0];
 		double ret = 0;
 		for(int bi = startA; bi<endA; ++bi) {
 			double lossContrib = 0;
@@ -633,20 +533,36 @@ public class BatchReNorm extends BatchNormoid{
 				continue;
 			ActivationSet a = b.get(t);
 			for(int i=startI; i<endI; ++i) {
-				float mean = params.get(this.runningMean, i);
-				float sdev = params.get(this.runningSdev, i);
+				float mean = params.get(this.mean, i);
+				float inv_sdev = params.get(this.inv_sd, i);
+				//						if(i==0) {
+				//							System.out.println("mean = "+mean+", var = "+var);
+				//							System.out.println("add = "+addVal+", mult = "+multVal);
+				//						}
+				//						System.out.println(" (x + "+mShift+") * "+vScale+" * "+multVal+" + "+addVal);
 
-				float scal = 1/sdev;
-				double entropy = 0.5*(1+Math.log(sdev*sdev));
- 				int index = i;
-				float activation = a.get(in, index);
-				float normalized = (activation - mean)*scal;
-				lossContrib += 0.5*normalized*normalized + Math.log(sdev) - entropy;
-
+				float scal = inv_sdev;
+				double entropy = 0.5*(1-Math.log(scal*scal));
+				for(int bri = startBri; bri<endBri; bri++) {
+					int index = tf.index(bri, i);
+					float activation = a.get(in, index);
+					float normalized = (activation - mean)*scal;
+					lossContrib += 0.5*normalized*normalized - Math.log(Math.abs(inv_sdev))-entropy;
+				}
+				
 
 			}
 			ret += lossContrib;	
 		}
 		return ret;
+	}
+	
+	@Override
+	public double mapSigmaFromStorage(double s) {
+		return 1/s;
+	}
+	@Override
+	public double mapSigmaToStorage(double s) {
+		return 1/s;
 	}
 }

@@ -43,8 +43,8 @@ public final class ActivationSet implements Cloneable{
 		assert index>=0;
 		assert index<i.count;
 		float ret = value[i.offset + index];
-		if(Double.isNaN(ret))
-			System.out.println();
+//		if(Double.isNaN(ret))
+//			System.out.println();
 		return ret;
 	}
 

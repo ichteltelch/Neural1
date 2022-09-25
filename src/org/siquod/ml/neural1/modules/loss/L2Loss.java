@@ -16,28 +16,18 @@ import org.siquod.ml.neural1.ParamBlocks;
 import org.siquod.ml.neural1.ParamSet;
 import org.siquod.ml.neural1.TensorFormat;
 
-/**
- * This negative log-likelihood loss layer expects a logarithmized probability distribution in 
- * its input interface "in", a probability distribution in its input interface "target" and 
- * outputs the loss in its one-dimensional output interface "loss". 
- * 
- * It is possible to sum the losses from multiple distributions using {@link LossGroup}s 
- * @author bb
- *
- */
-public class NllLoss extends LossLayer{
+public class L2Loss extends LossLayer{
 	Interface in, target, loss;
 	List<String> phases;
 	LossGroup[] lgs;
 	TensorFormat tf;
 
-	public NllLoss(String... ph) {
+	public L2Loss(String... ph) {
 		this(null, ph);
 	}
 
 
-	public NllLoss(LossGroup[] lgs, String... ph) {
-		phases=Arrays.asList(ph.clone());
+	public L2Loss(LossGroup[] lgs, String... ph) {
 		this.lgs=lgs;
 	}
 
@@ -102,32 +92,14 @@ public class NllLoss extends LossLayer{
 						gate = lg.weight;
 					}
 					float rr = 0;
-					if(lg.isSingleton()) {
-						int i = lg.start;
-						int index = tf.index(bri, i);
-						double trg = a.get(target, index);
-						double pp = a.get(in, index);
-
-						if (trg>0) {
-							rr += trg*(Math.log(trg)-Math.log(pp));
-						}
-						if(trg<1) {
-							rr += (1-trg)*(Math.log(1-trg)-Math.log(1-pp));
-						}
-						if(!Float.isFinite(rr)) {
-							System.out.println();
-							rr = 0;
-						}
-					}else {
+					{
 						for(int i=lg.start; i<lg.end; i++){
 							int index = tf.index(bri, i);
 							double trg = a.get(target, index);
-							if (trg<=0) continue;
 							double pp = a.get(in, index);
-							rr += trg*(Math.log(trg)-pp);
-//							if(!Float.isFinite(rr)) {
-//								System.out.println();
-//							}
+							double diff = trg - pp;
+							rr += diff*diff;
+
 
 						}
 					}
@@ -165,40 +137,19 @@ public class NllLoss extends LossLayer{
 					}
 					float ge = gate*e;
 					
-					if(lg.isSingleton()) {
-						int i = lg.start;
-						int index = tf.index(bri, i);
-						float trg = a.get(target, index);
-						float pp = a.get(in, index);
-						
-						float ppe=0;
-						if (trg>0) {
-							ppe += trg*(-1/(pp));
-						}
-						if(trg<1) {
-							ppe += (1-trg)*(1/(1-pp));
-						}
-						if(!Float.isFinite(ppe)) {
-							ppe=0;
-						}
-						es.add(in, index, ppe*ge);
-
-					}else {
-//						for(int i=lg.start; i<lg.end; i++){
-//							int index = tf.index(bri, i);
-//							double trg = a.get(target, index);
-//							if (trg<=0) continue;
-//							double pp = a.get(in, index);
-//							rr += trg*(Math.log(trg)-pp);
-//							if(!Float.isFinite(rr)) {
-//								System.out.println();
-//							}
-//
-//						}
+					{
 						for(int i=lg.start; i<lg.end; i++){
 							int index = tf.index(bri, i);
-							es.add(in, index, -a.get(target, index)*ge);
-						}	
+							double trg = a.get(target, index);
+							if (trg<=0) continue;
+							double pp = a.get(in, index);
+							double diff = pp-trg;
+							
+							es.add(in, index, (float)(ge *   2 * diff));
+
+
+						}
+
 					}
 					
 
@@ -231,4 +182,5 @@ public class NllLoss extends LossLayer{
 	public List<Module> getSubmodules() {
 		return Collections.emptyList();
 	}
+	
 }

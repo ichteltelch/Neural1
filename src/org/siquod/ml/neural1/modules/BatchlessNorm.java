@@ -20,12 +20,12 @@ import org.siquod.ml.neural1.ParamBlocks;
 import org.siquod.ml.neural1.ParamSet;
 import org.siquod.ml.neural1.TensorFormat;
 
-public class BatchlessNorm implements InOutScaleBiasModule{
+public class BatchlessNorm extends AbstractBatchNorm{
 
 	private Interface in;
 	private Interface out;
 	private Interface loss;
-	ParamBlock mean, log_sd, add, mult;
+	ParamBlock mean, sd, add, mult;
 	int age=0;
 	boolean hasAdd=true;
 	boolean broadcast;
@@ -65,7 +65,7 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 		if(hasAdd) add = ia.allocate(new ParamBlock("add", ch));
 		mult = ia.allocate(new ParamBlock("mult", ch));
 		mean = ia.allocate(new ParamBlock("mean", ch));
-		log_sd = ia.allocate(new ParamBlock("log_sdev", ch));
+		sd = ia.allocate(new ParamBlock("sdev", ch));
 	}
 
 	@Override
@@ -74,7 +74,7 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 		if(hasAdd) add = ps.get("add", ch);
 		mult = ps.get("mult", ch);		
 		mean = ps.get("mean", ch);
-		log_sd = ps.get("log_sd", ch);		
+		sd = ps.get("sd", ch);		
 	}
 
 	@Override
@@ -83,7 +83,7 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 		if(hasAdd) ret.add(add);
 		ret.add(mult);
 		ret.add(mean);
-		ret.add(log_sd);
+		ret.add(sd);
 		return ret;
 	}
 
@@ -102,7 +102,7 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 					int endI = ch;
 					int startBri = 0;
 					int endBri = tf.dims[0];
-					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, false);
 				}else {
 					AtomicInteger done = new AtomicInteger();
 					int neededWorkers = Math.min(par, taskCount);
@@ -120,7 +120,7 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 									int endI = (task+1) * ch / taskCount;
 									int startBri = 0;
 									int endBri = tf.dims[0];
-									forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+									forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, false);
 								}
 							}));
 						}
@@ -144,7 +144,7 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 					int startBri = 0;
 					int endBri = tf.dims[0];
 
-					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true);
 				}else{
 					AtomicInteger done = new AtomicInteger();
 					int workersNeeded = Math.min(par, maxPar);
@@ -163,7 +163,7 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 										int endI = ch;
 										int startBri = 0;
 										int endBri = tf.dims[0];
-										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true);
 									}
 								}));
 							}
@@ -180,7 +180,7 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 										int endA = as.length;
 										int startBri = 0;
 										int endBri = tf.dims[0];
-										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true);
 									}
 								}));
 							}
@@ -203,7 +203,8 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 
 	}
 	private void forwardSlice(ParamSet params, ActivationBatch as, int t, 
-			int startI, int endI, int startA, int endA, int startBri, int endBri) {
+			int startI, int endI, int startA, int endA, int startBri, int endBri,
+			boolean computeLoss) {
 		for(int bi = startA; bi<endA; ++bi) {
 			double lossContrib = 0;
 			ActivationSeq b = as.a[bi];
@@ -212,7 +213,7 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 			ActivationSet a = b.get(t);
 			for(int i=startI; i<endI; ++i) {
 				float mean = params.get(this.mean, i);
-				float log_sdev = params.get(this.log_sd, i);
+				float sdev = params.get(this.sd, i);
 				float addVal=hasAdd?params.get(add, i):0;
 				float multVal=params.get(mult, i);
 				//						if(i==0) {
@@ -221,21 +222,24 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 				//						}
 				//						System.out.println(" (x + "+mShift+") * "+vScale+" * "+multVal+" + "+addVal);
 
-				float scal = (float)Math.exp(-log_sdev);
+				float scal = 1/sdev;
 				for(int bri = startBri; bri<endBri; bri++) {
 					int index = tf.index(bri, i);
 					float activation = a.get(in, index);
 					float normalized = (activation - mean)*scal;
-					lossContrib += normalized*normalized + log_sdev;
+					if(computeLoss)
+						lossContrib += 0.5*normalized*normalized + Math.log(Math.abs(sdev));
 					float denormalized = normalized*multVal + addVal;
 					a.add(out, index, denormalized);
 				}
 				
 
 			}
+			if(computeLoss) {
 			lossContrib *= lr;
 			synchronized (loss) {
 				a.add(loss, 1, (float)lossContrib);
+			}
 			}
 		}
 	}
@@ -315,11 +319,11 @@ public class BatchlessNorm implements InOutScaleBiasModule{
  */
 				
 //				float mean = params.get(this.mean, i);
-				float log_sdev = params.get(this.log_sd, i);
+				float sdev = params.get(this.sd, i);
 //				float addVal=hasAdd?params.get(add, i):0;
 				float multVal=params.get(mult, i);
 
-				float scal = (float)Math.exp(-log_sdev);
+				float scal = 1/sdev;
 				for(int bri = startBri; bri<endBri; bri++) {
 					int index = tf.index(bri, i);
 //					float in_activation = a.get(in, index);
@@ -387,10 +391,10 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 			int startBri, int endBri) {
 		for(int i=startI; i<endI; ++i) {
 			float mean = params.get(this.mean, i);
-			float log_sdev = params.get(this.log_sd, i);
+			float sdev = params.get(this.sd, i);
 //			float mult=params.get(this.mult, i);
 //			float add=this.hasAdd?params.get(this.add, i):0;
-			float scal = (float)Math.exp(-log_sdev);
+			float scal = 1/sdev;
 
 			//				int count=0;
 
@@ -421,8 +425,8 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 					float normalized = shifted*scal;
 					ðmult += normalized * ðout;
 					
-					ðmean += ðloss_lr * (-2*normalized*scal);
-					ðlog_sdev += ðloss_lr * (1 - 2*normalized*normalized);
+					ðmean += ðloss_lr * (-normalized*scal);
+					ðlog_sdev += ðloss_lr * (1 - normalized*normalized);
 				}
 
 
@@ -431,7 +435,14 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 				gradients.add(this.add, i, ðadd);
 			gradients.add(this.mult, i, ðmult);
 			gradients.add(this.mean, i, ðmean);
-			gradients.add(this.log_sd, i, ðlog_sdev);
+			// inv_sd = exp(-log_sd)
+//			double ðscal = ðlog_sdev * -scal;
+			double ðsdev = ðlog_sdev * scal;;
+			// log_sdev = log sdev
+			// ðsdev = ðlog_sdev / sdev
+			// scal = 1/sdev = exp (- log_sdev))
+			// ðsdev = ðlog_sdev * exp (- log_sdev)) * -1/sdev =  ðlog_sdev * (1/sdev) * -1/sdev 
+			gradients.add(this.sd, i, ðsdev);
 			//				gradients.set(runningMean, i, 0);
 			//				gradients.add(runningVar, i, 0);
 		}
@@ -449,7 +460,7 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 				p.set(add, i, 0);
 			p.set(mult, i, 1);
 			p.set(mean, i, 0);
-			p.set(log_sd, i, 0);
+			p.set(sd, i, 1);
 		}
 	}
 
@@ -501,5 +512,62 @@ public class BatchlessNorm implements InOutScaleBiasModule{
 			throw new IllegalArgumentException();
 		par = threads;
 		return this;
+	}
+	
+	@Override
+	public ParamBlock sigmaSotrage() {
+		return sd;
+	}
+	@Override
+	public ParamBlock meanStorage() {
+		return mean;
+	}
+	@Override
+	public double distributionMismatch(ActivationBatch as, ParamSet params, int t) {
+		int startI = 0;
+		int endI = tf.channels();
+		int startA = 0;
+		int endA = as.length;
+		int startBri = 0;
+		int endBri = tf.dims[0];
+		double ret = 0;
+		for(int bi = startA; bi<endA; ++bi) {
+			double lossContrib = 0;
+			ActivationSeq b = as.a[bi];
+			if(b==null)
+				continue;
+			ActivationSet a = b.get(t);
+			for(int i=startI; i<endI; ++i) {
+				float mean = params.get(this.mean, i);
+				float sdev = params.get(this.sd, i);
+				//						if(i==0) {
+				//							System.out.println("mean = "+mean+", var = "+var);
+				//							System.out.println("add = "+addVal+", mult = "+multVal);
+				//						}
+				//						System.out.println(" (x + "+mShift+") * "+vScale+" * "+multVal+" + "+addVal);
+
+				float scal = 1/sdev;
+				double entropy = 0.5*(1-Math.log(scal*scal));
+				for(int bri = startBri; bri<endBri; bri++) {
+					int index = tf.index(bri, i);
+					float activation = a.get(in, index);
+					float normalized = (activation - mean)*scal;
+					lossContrib += 0.5*normalized*normalized + Math.log(Math.abs(sdev))-entropy;
+				}
+				
+
+			}
+			ret += lossContrib;	
+		}
+		return ret;
+	}
+	
+	@Override
+	public double mapSigmaFromStorage(double s) {
+		return s;
+	}
+	@Override
+	public double mapSigmaToStorage(double s) {
+		return s;
 	}
 }
