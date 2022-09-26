@@ -9,14 +9,14 @@ public class Adam extends Updater{
 	float beta1exp=1;
 	float beta2exp=1;
 	ParamSet m, v;
-	public void apply(ParamSet ps, ParamSet grad, float lr, float totalWeight){
+	public void apply(ParamSet ps, ParamSet grad, ParamSet lrMult, float lr, float totalWeight){
 		beta1exp*=beta1;
 		beta2exp*=beta2;
 		if(m==null){
 			m=new ParamSet(ps.size());
 			v=new ParamSet(ps.size());
 		}
-		ps.adam(lr, beta1, beta2, epsilon, beta1exp, beta2exp, grad, m ,v, totalWeight);
+		ps.adam(lr, lrMult, beta1, beta2, epsilon, beta1exp, beta2exp, grad, m ,v, totalWeight);
 	}
 	@Override
 	protected void cloneData() {

@@ -9,7 +9,7 @@ public class AmsGrad extends Updater{
 	float beta1pow=1;
 	float beta2pow=1;
 	ParamSet m, v, vm;
-	public void apply(ParamSet ps, ParamSet grad, float lr, float totalWeight){
+	public void apply(ParamSet ps, ParamSet grad, ParamSet lrMult, float lr, float totalWeight){
 		beta1pow*=beta1;
 		beta2pow*=beta2;
 		if(m==null){
@@ -19,7 +19,7 @@ public class AmsGrad extends Updater{
 		if(vm==null) {
 			vm=new ParamSet(ps.size());
 		}
-		ps.amsGrad(lr, beta1, beta2, epsilon, beta1pow, beta2pow, grad, m ,v, vm, totalWeight);
+		ps.amsGrad(lr, lrMult, beta1, beta2, epsilon, beta1pow, beta2pow, grad, m ,v, vm, totalWeight);
 	}
 	@Override
 	protected void cloneData() {

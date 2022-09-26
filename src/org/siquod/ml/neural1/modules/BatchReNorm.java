@@ -35,6 +35,8 @@ public class BatchReNorm extends BatchNormoid{
 
 	Function<Integer, Float> rmaxSchedule=rmaxSchedule(100);
 	Function<Integer, Float> dmaxSchedule=dmaxSchedule(100);
+	public float learnRateMultiplier() {return (float)0;}
+	@Override TensorFormat tf() {return tf;}
 
 	static Function<Integer, Float> rmaxSchedule(int scal){
 		return n -> n < scal ? 1 : n <8*scal ?  1+2*(n-scal)/7f:3;

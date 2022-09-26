@@ -15,6 +15,7 @@ import org.siquod.ml.neural1.ParamAllocator;
 import org.siquod.ml.neural1.ParamBlock;
 import org.siquod.ml.neural1.ParamBlocks;
 import org.siquod.ml.neural1.ParamSet;
+import org.siquod.ml.neural1.TensorFormat;
 
 public class BatchNorm extends BatchNormoid{
 
@@ -31,6 +32,8 @@ public class BatchNorm extends BatchNormoid{
 		this(true);
 	}
 	ParamBlock add, mult;
+	TensorFormat tf;
+	@Override TensorFormat tf() {return tf;}
 
 	@Override
 	public void allocate(InterfaceAllocator ia) {
@@ -38,7 +41,7 @@ public class BatchNorm extends BatchNormoid{
 		out = ia.get("out");
 		if(in.count!=out.count)
 			throw new IllegalArgumentException("input and output layer must be of the same size");
-
+		tf = new TensorFormat(1, in.count);
 	}
 
 	@Override
@@ -227,6 +230,7 @@ public class BatchNorm extends BatchNormoid{
 			throw new UnsupportedOperationException("Not implemented");
 		}
 	}
+	public float learnRateMultiplier() {return (float)0;}
 
 	@Override
 	public void gradients(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, ParamSet gradients,

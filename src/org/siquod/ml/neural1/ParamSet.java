@@ -4,7 +4,7 @@ import java.util.Arrays;
 
 
 public final class ParamSet implements Cloneable{
-	private float[] value;
+	public float[] value;
 	public ParamSet(int size){
 		value=new float[size];
 	}
@@ -69,10 +69,11 @@ public final class ParamSet implements Cloneable{
 	public ParamSet clone(){
 		return new ParamSet(value);
 	}
-	public void rprop(ParamSet grad, ParamSet lastGrad, ParamSet gamma, float f) {
+	public void rprop(ParamSet grad, ParamSet lastGrad, ParamSet gamma, float f, ParamSet lrMult) {
 		float[] gr  = grad.value;
 		float[] og = lastGrad.value;
 		float[] ga = gamma.value;
+		float[] lrv= lrMult.value;
 		for(int i=value.length-1; i>=0; --i){
 			float gv = gr[i];
 			float ogv=og[i];
@@ -86,39 +87,41 @@ public final class ParamSet implements Cloneable{
 				gav=Math.max(gav*0.5f, 1e-6f);
 				ogv=Float.NaN;
 			}
-			value[i] -= Math.signum(gv)*gav;
+			value[i] -= Math.signum(gv)*gav*lrv[i];
 //			if(Double.isInfinite(value[i]))
 //				throw new IllegalArgumentException();
 			ga[i] = gav;
 		}
 		System.arraycopy(gr, 0, og, 0, gr.length);
 	}
-	public void adam(float lr, float beta1, float beta2, float epsilon, 
+	public void adam(float lr, ParamSet lrMult, float beta1, float beta2, float epsilon, 
 			float beta1pow, float beta2pow, ParamSet grad, ParamSet m, ParamSet v, float totalWeight) {
 		float[] gr  = grad.value;
 		float[] mv = m.value;
 		float[] vv = v.value;
+		float[] lrv= lrMult.value;
 		for(int i=value.length-1; i>=0; --i){
 			float grv=gr[i]/totalWeight;
 			float mn = (mv[i] = beta1*mv[i] + (1-beta1)*grv)/(1-beta1pow);
 			float vn = (vv[i] = beta2*vv[i] + (1-beta2)*grv*grv)/(1-beta2pow);
-			value[i] -= lr*mn/(Math.sqrt(vn)+epsilon);
+			value[i] -= lrv[i]*lr*mn/(Math.sqrt(vn)+epsilon);
 			
 		}
 	
 	}
-	public void amsGrad(float lr, float beta1, float beta2, float epsilon, 
+	public void amsGrad(float lr, ParamSet lrMult, float beta1, float beta2, float epsilon, 
 			float beta1pow, float beta2pow, ParamSet grad, ParamSet m, ParamSet v, ParamSet vm, float totalWeight) {
 		float[] gr  = grad.value;
 		float[] mv = m.value;
 		float[] vv = v.value;
 		float[] vmv = vm.value;
+		float[] lrv= lrMult.value;
 		for(int i=value.length-1; i>=0; --i){
 			float grv=gr[i]/totalWeight;
 			float mn = (mv[i] = beta1*mv[i] + (1-beta1)*grv)/(1-beta1pow);
 			float vn = (vv[i] = beta2*vv[i] + (1-beta2)*grv*grv)/(1-beta2pow);
 			float vmn=vmv[i]=beta2pow>0.97?vn:Math.max(vn, vmv[i]);
-			value[i] -= lr*mn/(Math.sqrt(vmn)+epsilon);
+			value[i] -= lr*lrv[i]*mn/(Math.sqrt(vmn)+epsilon);
 		}
 	
 	}
@@ -145,5 +148,10 @@ public final class ParamSet implements Cloneable{
 		if(params.length!=value.length)
 			throw new IllegalArgumentException("Cannot set parameters: length mismatch");
 		System.arraycopy(params, 0, value, 0, params.length);
+	}
+	public void setAll(ParamBlock b, float m) {
+		for(int at=b.start, i=0; i<b.count; ++i, ++at) {
+			value[at]=m;
+		}
 	}
 }

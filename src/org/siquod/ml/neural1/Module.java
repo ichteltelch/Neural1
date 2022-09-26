@@ -42,6 +42,12 @@ public interface Module {
 			m.allocateStatistics(ia);
 		}
 	}
+	default void setLearnRateMultipliers(ParamSet lrm) {
+		for(Module m: getSubmodules()) {
+			m.setLearnRateMultipliers(lrm);
+		}
+	}
+
 	default void updateStatistics(ActivationSeq stat, ParamSet params, Function<Integer, Float> owt, float[] weight, int tMin) {
 		for(Module m: getSubmodules())
 			m.updateStatistics(stat, params, owt, weight, tMin);

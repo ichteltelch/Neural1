@@ -3,7 +3,7 @@ package org.siquod.ml.neural1.optimizers;
 import org.siquod.ml.neural1.ParamSet;
 
 public abstract class Updater implements Cloneable{
-	public abstract void apply(ParamSet ps, ParamSet grad, float lr, float totalWeight);
+	public abstract void apply(ParamSet ps, ParamSet grad, ParamSet lrMult, float lr, float totalWeight);
 	@Override
 	public Updater clone() {
 		try {

@@ -31,8 +31,12 @@ public class BatchlessNorm extends AbstractBatchNorm{
 	boolean broadcast;
 	int par=1;
 	TensorFormat tf;
+	@Override TensorFormat tf() {return tf;}
 	Supplier<? extends Interface> lossSupplier;
-	double lr = .1;
+	double gradmul=defaultGradMult;
+	double lr = defaultLrMult;
+	@Override
+	public float learnRateMultiplier() {return (float)lr;}
 
 
 	public BatchlessNorm(boolean hasAdd, boolean broadcast, Supplier<? extends Interface> lossSupplier) {
@@ -236,7 +240,7 @@ public class BatchlessNorm extends AbstractBatchNorm{
 
 			}
 			if(computeLoss) {
-			lossContrib *= lr;
+			lossContrib *= gradmul;
 			synchronized (loss) {
 				a.add(loss, 1, (float)lossContrib);
 			}
@@ -409,7 +413,7 @@ public class BatchlessNorm extends AbstractBatchNorm{
 				//					count++;
 				ActivationSet a = as.a[b].get(t);
 				ActivationSet e = es.get(t);
-				double ðloss_lr = e.get(loss, 1)*lr;
+				double ðloss_lr = e.get(loss, 1)*gradmul;
 				/**
 				 * ðlog_sd = learn_rate_multiplier · ðloss · (1 - 2·(in_activation - mean)²·exp(-log_sd)²)
 				 * ðmean = learn_rate_multiplier · ðloss · (- 2·(in_activation - mean) · exp(-log_sd)² )
@@ -515,7 +519,7 @@ public class BatchlessNorm extends AbstractBatchNorm{
 	}
 	
 	@Override
-	public ParamBlock sigmaSotrage() {
+	public ParamBlock sigmaStorage() {
 		return sd;
 	}
 	@Override

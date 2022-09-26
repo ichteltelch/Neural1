@@ -66,6 +66,9 @@ public class Recurrent {
 	public class NaiveTrainer{
 		ParamSet ps=new ParamSet(paramCount);
 		ParamSet grad=new ParamSet(paramCount);
+		ParamSet lrm=new ParamSet(paramCount);
+		{
+		}
 		//		Updater u=new Adam();
 		//		Updater u=new Rprop();
 		//		Updater u=new SGD();
@@ -199,7 +202,7 @@ public class Recurrent {
 			net.regularize("training", ps, grad, globReg*impsum);
 
 			grad.clip(5f);
-			u.apply(ps, grad, (float)learnRate, impsum);
+			u.apply(ps, grad, lrm, (float)learnRate, impsum);
 			grad.clear();
 			impsum=0;
 		}

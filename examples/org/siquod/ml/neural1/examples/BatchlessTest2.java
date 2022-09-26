@@ -16,8 +16,10 @@ import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 
+import org.siquod.ml.data.ShuffledCursor;
 import org.siquod.ml.data.TrainingBatchCursor;
 import org.siquod.ml.data.TrainingBatchCursor.RandomAccess;
+import org.siquod.ml.neural1.modules.AbstractBatchNorm;
 import org.siquod.ml.neural1.modules.BatchNorm;
 import org.siquod.ml.neural1.modules.BatchNormoid;
 import org.siquod.ml.neural1.modules.BatchNormoid.FinalizationMode;
@@ -37,7 +39,10 @@ import org.siquod.ml.neural1.modules.regularizer.Regularizer;
 import org.siquod.ml.neural1.net.FeedForward;
 import org.siquod.ml.neural1.neurons.Isrlu;
 import org.siquod.ml.neural1.neurons.Neuron;
+import org.siquod.ml.neural1.optimizers.Adam;
 import org.siquod.ml.neural1.optimizers.AmsGrad;
+import org.siquod.ml.neural1.optimizers.Rprop;
+import org.siquod.ml.neural1.optimizers.SGD;
 
 
 public class BatchlessTest2 implements Runnable{
@@ -49,7 +54,7 @@ public class BatchlessTest2 implements Runnable{
 		BLNLOG,
 		BLNINV,
 	}
-	static int dataMultiplier = 100;
+	static int dataMultiplier = 10;
 	//Example data sets
 	static float[][][] data1;
 	static float[][][] data2;
@@ -110,66 +115,59 @@ public class BatchlessTest2 implements Runnable{
 
 
 
-	private InOutModule makeStack() {
-		boolean useBias = bnType==BnType.NONE;
-		return new StackModule()
-				//			.addLayer(2, new BatchNorm())
-				//Add a dense layer, followed by a batch normalization layer, with 50 channels each
-				.addLayer(50, new Dense(useBias).regularizer(reg), bn())
-				//Add a nonlinearity layer using the chosen activation function
-				.addLayer(50, new Nonlin(neuron))
-				//Add a dropout layer for better regularization
-				.addLayer(Dropout.factory(0.9))
-				//Add another dense and batch norm and nonlinearity layer, with 40 channels each
-				.addLayer(40, new Dense(useBias).regularizer(reg), bn(), new Nonlin(neuron))
-				//Add a dropout layer for better regularization
-				.addLayer(Dropout.factory(0.9))
-				//Add another dense and batch norm and nonlinearity layer, with 40 channels each
-				.addLayer(40, new Dense(useBias).regularizer(reg), bn(), new Nonlin(neuron))
-				//Add a dropout layer for better regularization
-				.addLayer(Dropout.factory(0.9))
-				//			//Add another dense and batch norm and nonlinearity layer, with 40 channels each
-				//			.addLayer(40, new Dense().regularizer(reg), bn(), new Nonlin(neuron))
-				//			//Add a dropout layer for better regularization
-				//			.addLayer(Dropout.factory(0.9))
-				//			//Add another dense and batch norm and nonlinearity layer, with 40 channels each
-				//			.addLayer(40, new Dense().regularizer(reg), bn(), new Nonlin(neuron))
-				//			//And another dropout layer
-				//			.addLayer(Dropout.factory(0.9))
-				//Add a final dense layer
-				.addFinalLayer(3, new Dense().regularizer(reg));
-	}
-
-	ArrayList<BatchNormoid> bnoids = new ArrayList<>(); 
+	ArrayList<BatchNormoid> needsFinalize= new ArrayList<>(); 
+	ArrayList<AbstractBatchNorm> needsInit = new ArrayList<>(); 
 
 	private InOutModule bn() {
 		switch(bnType) {
 		case NONE: return new Copy();
-		case BN: 
+		case BN: {
 			BatchNorm bn = new BatchNorm();
-			bnoids.add(bn);
+			needsFinalize.add(bn);
 			return bn;
-		case BRN: 
+		}
+		case BRN: {
 			BatchReNorm brn = new BatchReNorm();
-			bnoids.add(brn);
+			needsFinalize.add(brn);
 			return brn;
-		case BLN: return new BatchlessNorm(()->net.loss);
-		case BLNLOG: return new BatchlessNormLog(()->net.loss);
-		case BLNINV: return new BatchlessNormInv(()->net.loss);
+		}
+		case BLN: {
+			BatchlessNorm bn = new BatchlessNorm(()->net.loss);
+			needsInit.add(bn);
+			return bn;
+		}
+		case BLNLOG: {
+			BatchlessNormLog bn = new BatchlessNormLog(()->net.loss);
+			needsInit.add(bn);
+			return bn;
+		}
+		case BLNINV: {
+			BatchlessNormInv bn = new BatchlessNormInv(()->net.loss);
+			needsInit.add(bn);
+			return bn;
+		}
 		default: return null;
 		}
 	}
-	protected void finalize() {
+	protected void finalizeBn() {
 		TrainingBatchCursor cursor = cursor(data);
 
-		for(int i=0; i<bnoids.size(); ++i) {
-			BatchNormoid bn =bnoids.get(i);
+		for(int i=0; i<needsFinalize.size(); ++i) {
+			BatchNormoid bn =needsFinalize.get(i);
 			bn.setMode(FinalizationMode.MEANS, tr.getParams());
 			eval.computeLoss(cursor, 1000);
 			bn.setMode(FinalizationMode.STANDARD_DEVIATIONS, tr.getParams());
 			eval.computeLoss(cursor, 1000);
 			bn.setMode(FinalizationMode.NONE, tr.getParams());
 		}
+	}
+	protected void initBn(){
+		if(needsInit.isEmpty())
+			return;
+		ShuffledCursor cursor = new ShuffledCursor(cursor(data));
+		cursor.shuffle();
+		AbstractBatchNorm.setNormalizerParameters(eval, 128, cursor.subsequence(0, 128*2), needsInit);
+
 	}
 
 	//Another example of a network definition
@@ -206,6 +204,41 @@ public class BatchlessTest2 implements Runnable{
 
 
 
+	private InOutModule makeStack() {
+		boolean useBias = bnType==BnType.NONE;
+		int firstLayerWidth = 50; //50
+		int extraLayers = 20; //2
+		
+		int extraLayerWidth =40; //40
+		StackModule ret = new StackModule();
+		ret
+				//			.addLayer(2, new BatchNorm())
+				//Add a dense layer, followed by a batch normalization layer, with 50 channels each
+				.addLayer(firstLayerWidth, new Dense(useBias).regularizer(reg), bn())
+				//Add a nonlinearity layer using the chosen activation function
+				.addLayer(firstLayerWidth, new Nonlin(neuron))
+				//Add a dropout layer for better regularization
+				.addLayer(Dropout.factory(0.9));
+		for(int i=0; i<extraLayers; ++i) {
+			ret
+				//Add another dense and batch norm and nonlinearity layer, with 40 channels each
+				.addLayer(extraLayerWidth, new Dense(useBias).regularizer(reg), bn(), new Nonlin(neuron))
+				//Add a dropout layer for better regularization
+				.addLayer(Dropout.factory(0.9));
+		}
+	
+				//			//Add another dense and batch norm and nonlinearity layer, with 40 channels each
+				//			.addLayer(40, new Dense().regularizer(reg), bn(), new Nonlin(neuron))
+				//			//Add a dropout layer for better regularization
+				//			.addLayer(Dropout.factory(0.9))
+				//			//Add another dense and batch norm and nonlinearity layer, with 40 channels each
+				//			.addLayer(40, new Dense().regularizer(reg), bn(), new Nonlin(neuron))
+				//			//And another dropout layer
+				//			.addLayer(Dropout.factory(0.9))
+				//Add a final dense layer
+				ret.addFinalLayer(3, new Dense().regularizer(reg));
+		return ret;
+	}
 	private FeedForward makeNet() {
 		return new FeedForward(mod, new SoftMaxNllLoss(), inputs.length, outputs.length);
 	}
@@ -235,7 +268,7 @@ public class BatchlessTest2 implements Runnable{
 	double[] sortedLosses = new double[m];
 	double smoothedDiffLoss = 0;
 	double smoothedDiffLossWeight = 0;
-	double smoothedDiffLossDecay = 0.95;
+	double smoothedDiffLossDecay = 0.999;
 	double latestOptimalLearnRate;
 	boolean adaptLearnRate = true;
 	public double latestOptimalLearnRate(){return latestOptimalLearnRate;}
@@ -277,12 +310,13 @@ public class BatchlessTest2 implements Runnable{
 
 		//Create the trainer and initialize the weights
 		tr=net.getNaiveTrainer(batchSize, new AmsGrad());
+//		tr=net.getNaiveTrainer(batchSize, new SGD());
 		tr.initSmallWeights(1);
-		optimalLearnRateSoFar=latestOptimalLearnRate=tr.learnRate=0.01;
+		optimalLearnRateSoFar=latestOptimalLearnRate=learnRate=adaptLearnRate?.0001:0.01;
 
 		//create the evaluator
 		eval=tr.getEvaluator(false);
-
+		initBn();
 	}
 
 	boolean graphical;
@@ -404,9 +438,11 @@ public class BatchlessTest2 implements Runnable{
 	double oldMedianLoss;
 	double oldMinimumLoss;
 	double oldLoss;
+	double learnRate;
 	private void batchTrain(int its) {
 		Random r = new Random();
 		for(int it=0; it<its; it++){
+			tr.learnRate = adaptLearnRate?learnRate*10:learnRate;
 			if(miniBatches) {
 				//randomly choose training examples
 				for(int b=0; b<batchSize; ++b) {
@@ -436,9 +472,9 @@ public class BatchlessTest2 implements Runnable{
 
 			double medianLoss = sortedLosses[m/2];
 			double minimumLoss = sortedLosses[0];
-//			double diffLoss = batchesProcessed==1?0:loss-oldLoss;
+			double diffLoss = batchesProcessed==1?0:loss-oldLoss;
 //			double diffLoss = batchesProcessed<=sortedLosses.length?0:medianLoss - oldMedianLoss;
-			double diffLoss = batchesProcessed<=2?0:minimumLoss - oldMinimumLoss;
+//			double diffLoss = batchesProcessed<=2?0:minimumLoss - oldMinimumLoss;
 			//					+ (medianLoss - oldMedianLoss) * (1-smoothedDiffLossDecay);
 			double newSmoothedDiffLoss = 
 					smoothedDiffLoss * smoothedDiffLossDecay * smoothedDiffLossWeight 
@@ -447,40 +483,42 @@ public class BatchlessTest2 implements Runnable{
 			smoothedDiffLoss = newSmoothedDiffLoss;
 			oldMedianLoss = medianLoss;
 			oldMinimumLoss = minimumLoss;
-//			System.out.println(tr.learnRate+" | " + loss + "| "+diffLoss+" | "+(smoothedDiffLoss/smoothedDiffLossWeight));;
+//			System.out.println(learnRate+" | " + loss + "| "+diffLoss+" | "+(smoothedDiffLoss/smoothedDiffLossWeight)+ " | "+smoothedDiffLossIncreases);;
 			oldLoss = loss;
 
+			int patience = 30;
 			if(adaptLearnRate) {
 				int sinceLearnRateReset = batchesProcessed%200;
 				if(sinceLearnRateReset==0) {
-					if(false && tr.learnRate<1e-5)
+					if(false && learnRate<1e-5)
 						startedSampleLogging=true;
-					tr.learnRate *= 0.25;
-					optimalLearnRateSoFar=tr.learnRate;
+					//learnRate *= 0.5;
+					
+					optimalLearnRateSoFar=learnRate;
 					smoothedDiffLossIncreases = 0;
 					smallestSmoothedDiffLoss = smoothedDiffLoss/smoothedDiffLossWeight;
 //					smoothedDiffLoss*=0.2;
 //					smoothedDiffLossWeight*=0.2;
 				}else if(sinceLearnRateReset>0) {
-					if(smoothedDiffLossIncreases>=30) {
-						if(smoothedDiffLossIncreases==30) {
-							tr.learnRate = optimalLearnRateSoFar;
-							latestOptimalLearnRate=optimalLearnRateSoFar;
-							smoothedDiffLossIncreases++;
-						}
+					if(smoothedDiffLossIncreases>=patience || sinceLearnRateReset == 1199) {
+						learnRate = optimalLearnRateSoFar*0.7;
+						latestOptimalLearnRate=learnRate;
+						smoothedDiffLossIncreases=0;
+						smallestSmoothedDiffLoss = smoothedDiffLoss/smoothedDiffLossWeight;
+
 					}else {
-						tr.learnRate *= 1.02;
+						learnRate *= 1.01;
 						if(smoothedDiffLoss/smoothedDiffLossWeight>smallestSmoothedDiffLoss)
 							++smoothedDiffLossIncreases;
 						else {
 							smallestSmoothedDiffLoss = smoothedDiffLoss/smoothedDiffLossWeight;
-							optimalLearnRateSoFar=tr.learnRate;
+							optimalLearnRateSoFar=learnRate;
 							smoothedDiffLossIncreases=0;
 						}
 					}
 				}
 			}
-			if(medianLoss<minLoss) {
+			if(medianLoss<=minLoss) {
 				minLoss = medianLoss;
 				lastLossDecrease = batchesProcessed;
 				//				System.out.println("Training loss decreased!");
@@ -502,7 +540,7 @@ public class BatchlessTest2 implements Runnable{
 					finalFluctuation = avgRad;
 					TrainingBatchCursor valCursor = cursor(validation);
 					TrainingBatchCursor trCursor = cursor(data);
-					finalize();
+					finalizeBn();
 					finalValidationLoss = eval.computeLoss(valCursor, 1000);
 					finalTrainingLoss = eval.computeLoss(trCursor, 1000);
 					break;
@@ -578,7 +616,8 @@ public class BatchlessTest2 implements Runnable{
 		net=null;
 		tr=null;
 		eval=null;
-		bnoids=null;
+		needsFinalize=null;
+		needsInit=null;
 		disp=null;
 		dispOutput=null;
 		lastMLosses = sortedLosses = null;
@@ -586,7 +625,7 @@ public class BatchlessTest2 implements Runnable{
 	}
 	public static void main(String[] args) throws InterruptedException {
 		if(!true) {
-			BatchlessTest2 inst = new BatchlessTest2(data2, data2Test, 16, BnType.BRN, !true);
+			BatchlessTest2 inst = new BatchlessTest2(data2, data2Test, 64, BnType.BLN, !true);
 			inst.run();
 			return;
 		}
@@ -645,7 +684,7 @@ public class BatchlessTest2 implements Runnable{
 				BatchlessTest2[] batch = data[bsi][bnType.ordinal()];
 				System.out.print(" & \t");
 				if(batch==null) {
-					System.out.print("-");
+					System.out.print(" -       ");
 				}else {
 					if(integer)
 						System.out.print("$"+(int)(metric.applyAsDouble(batch))+"$");

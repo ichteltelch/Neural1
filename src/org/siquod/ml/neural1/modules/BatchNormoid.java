@@ -61,7 +61,7 @@ public abstract class BatchNormoid extends AbstractBatchNorm{
 		return s;
 	}
 	@Override
-	public ParamBlock sigmaSotrage() {
+	public ParamBlock sigmaStorage() {
 		return runningSdev;
 	}
 	@Override

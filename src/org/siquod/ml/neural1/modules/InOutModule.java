@@ -5,6 +5,7 @@ import java.util.HashMap;
 import org.siquod.ml.neural1.Interface;
 import org.siquod.ml.neural1.InterfaceAllocator;
 import org.siquod.ml.neural1.Module;
+import org.siquod.ml.neural1.ParamSet;
 
 public interface InOutModule extends Module{
 	public default void allocate(InterfaceAllocator ia, String in, String out){

@@ -1,5 +1,6 @@
 package org.siquod.ml.neural1.net;
 
+import java.util.Arrays;
 import java.util.Random;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -204,6 +205,9 @@ public class FeedForward {
 			inputWhitener = whitener;
 			return this;
 		}
+		public ParamSet getParams() {
+			return ps;
+		}
 	}
 	public static String confusionMatrixToString(int[][] mat) {
 		StringBuilder t = new StringBuilder();
@@ -234,9 +238,15 @@ public class FeedForward {
 	public class NaiveTrainer implements Cloneable{
 		{
 			init();
-		}
+		}	
 		ParamSet ps=new ParamSet(paramCount);
+		ParamSet lrm=new ParamSet(paramCount);
+		{
+			Arrays.fill(lrm.value, 1);
+			net.setLearnRateMultipliers(lrm);
+		}
 		ParamSet grad=new ParamSet(paramCount);
+
 		//		Updater u=new Rprop();
 		Updater u;//=new SGD();
 		ActivationBatch ass, ess;
@@ -380,7 +390,7 @@ public class FeedForward {
 
 			net.regularize("training", ps, grad, globReg*(float)currentBatchSize);
 
-			u.apply(ps, grad, (float)learnRate, currentBatchSize);
+			u.apply(ps, grad, lrm, (float)learnRate, currentBatchSize);
 			grad.clear();
 			currentBatchSize=0;
 			batchCounter++;
