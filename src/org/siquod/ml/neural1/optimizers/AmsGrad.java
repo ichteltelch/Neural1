@@ -23,9 +23,9 @@ public class AmsGrad extends Updater{
 	}
 	@Override
 	protected void cloneData() {
-		m=m.clone();
-		v=v.clone();
-		vm=vm.clone();
+		if(m!=null)m=m.clone();
+		if(m!=null)v=v.clone();
+		if(m!=null)vm=vm.clone();
 	}
 	public void forgetVMax() {
 		vm=null;

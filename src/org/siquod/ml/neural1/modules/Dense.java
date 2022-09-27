@@ -132,6 +132,7 @@ public class Dense implements InOutBiasModule{
 
 	@Override
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst) {
+
 		int incount;
 		int outcount;
 		if(inst==null) {
@@ -189,6 +190,8 @@ public class Dense implements InOutBiasModule{
 					f.cancel(true);
 			}
 		}
+
+
 	}
 
 	private void forwardSlice(ParamSet params, ActivationBatch as, int t, int incount, int outcount, int startA,
@@ -422,7 +425,7 @@ public class Dense implements InOutBiasModule{
 							if(task>=taskCount)
 								return;
 							int startI, endI, startO, endO;
-							
+
 							if(incount>outcount){
 								startI = task * incount / taskCount;
 								endI = (task+1) * incount / taskCount;
@@ -434,7 +437,7 @@ public class Dense implements InOutBiasModule{
 								startI = 0;
 								endI = incount;
 							}
-							
+
 							if(inst==null) {
 								gradientsSlice(phase, as, errors, gradients, t, outcount, startI, endI, startO, endO);
 							}else{

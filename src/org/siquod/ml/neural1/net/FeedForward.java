@@ -47,17 +47,21 @@ public class FeedForward {
 
 		}
 		public void eval(float[] input, float[] output){
+
+
 			a.clear();
 			//			as.clearLifeInterfaces(true);
+
 
 			net.initializeRun(ass, false);
 			a.set(in, applyWhitener(input));
 			net.forward(ForwardPhase.TESTING, ps, ass, 0, null);
 			a.get(out, output);
-//			lossLayer.forward(ForwardPhase.TRAINING, ps, ass, 0, null);
-//			double lossVal =a.get(loss, 0);
-//			//			System.out.println(lossVal);
-//			return lossVal;
+
+			//			lossLayer.forward(ForwardPhase.TRAINING, ps, ass, 0, null);
+			//			double lossVal =a.get(loss, 0);
+			//			//			System.out.println(lossVal);
+			//			return lossVal;
 		}
 		private float[] applyWhitener(float[] input) {
 			if(inputWhitener==null)
@@ -127,7 +131,7 @@ public class FeedForward {
 					bi=0;
 					if(afterBatch!=null)
 						afterBatch.accept(ass);
-//					net.initializeRun(ass, false);
+					//					net.initializeRun(ass, false);
 				}
 
 
@@ -299,10 +303,10 @@ public class FeedForward {
 			while(!last) {
 				for(currentBatchSize=0; currentBatchSize<batchSize; ++currentBatchSize, ++count) {
 					if(data.isFinished()) {
-//						if(true) {
-//							currentBatchSize=0;
-//							return;
-//						}
+						//						if(true) {
+						//							currentBatchSize=0;
+						//							return;
+						//						}
 						data.reset();
 						last=true;
 					}
@@ -325,7 +329,7 @@ public class FeedForward {
 				endBatch();
 				if(data.isFinished())
 					break;
-						
+
 			}
 		}
 
@@ -425,7 +429,7 @@ public class FeedForward {
 		out=new Interface("output", outw);
 		target=new Interface("target", outw);
 		loss=new Interface("loss", new TensorFormat(2));
-//		init();
+		//		init();
 	}
 	public FeedForward(InOutModule net, LossLayer lossLayer, int inw, int outw, int tw){
 		this(net, lossLayer, new TensorFormat(inw), new TensorFormat(outw), new TensorFormat(tw));
@@ -437,7 +441,7 @@ public class FeedForward {
 		out=new Interface("output", outw);
 		target=new Interface("target", tw);
 		loss=new Interface("loss", new TensorFormat(2));
-//		init();
+		//		init();
 	}
 	InterfaceAllocator ia;
 	boolean inited = false;

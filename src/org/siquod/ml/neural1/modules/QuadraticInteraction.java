@@ -107,14 +107,14 @@ public class QuadraticInteraction implements InOutModule{
 			this.scaleDown=scaleDown;
 		}
 		@Override
-			public String toString() {
-				StringBuilder sb = new StringBuilder();
-				sb.append('[').append(repetitions).append(',').append(leftDim).append(',').append(midDim);
-				if(!symmetric)
-					sb.append(',').append(rightDim);
-					sb.append(']');
-				return sb.toString();
-			}
+		public String toString() {
+			StringBuilder sb = new StringBuilder();
+			sb.append('[').append(repetitions).append(',').append(leftDim).append(',').append(midDim);
+			if(!symmetric)
+				sb.append(',').append(rightDim);
+			sb.append(']');
+			return sb.toString();
+		}
 		public int[] toIntArray() {
 			if(symmetric)
 				return new int[] {repetitions, leftDim, midDim};
@@ -143,7 +143,7 @@ public class QuadraticInteraction implements InOutModule{
 		leftModule = leftFactory.produce(in, leftFactors);
 		rightModule = rightFactory.produce(in, rightFactors);
 		afterModule = afterFactory.produce(products, out);
-		
+
 		leftModule.allocate(ia, "in", "left");
 		rightModule.allocate(ia, "in", "right");
 		afterModule.allocate(ia, "products", "out");

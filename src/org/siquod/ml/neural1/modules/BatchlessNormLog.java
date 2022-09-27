@@ -300,8 +300,8 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 			int startA, int endA, 
 			int startI, int endI,
 			int startBri, int endBri) {
-		
-		
+
+
 		for(int bi = startA; bi<endA; ++bi) {
 			ActivationSeq asbi = as.a[bi];
 			if(asbi==null)
@@ -309,28 +309,28 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 			ActivationSeq esbi = errors.a[bi];
 			if(esbi==null)
 				continue;
-//			ActivationSet a = asbi.get(t);
+			//			ActivationSet a = asbi.get(t);
 			ActivationSet e = esbi.get(t);
-//			double ðloss_lr = e.get(loss, 0)*lr;
+			//			double ðloss_lr = e.get(loss, 0)*lr;
 			for(int i=startI; i<endI; ++i) {
-/**
- * ðin_actiavtion = ðout_activation · exp(-log_sd)
- */
-				
-//				float mean = params.get(this.mean, i);
+				/**
+				 * ðin_actiavtion = ðout_activation · exp(-log_sd)
+				 */
+
+				//				float mean = params.get(this.mean, i);
 				float log_sdev = params.get(this.log_sd, i);
-//				float addVal=hasAdd?params.get(add, i):0;
+				//				float addVal=hasAdd?params.get(add, i):0;
 				float multVal=params.get(mult, i);
 
 				float scal = (float)Math.exp(-log_sdev);
 				for(int bri = startBri; bri<endBri; bri++) {
 					int index = tf.index(bri, i);
-//					float in_activation = a.get(in, index);
+					//					float in_activation = a.get(in, index);
 					float ðout_activation = e.get(out, index) * multVal;
 					float ðin_activation = ðout_activation * scal;
 					e.add(in, index, ðin_activation);
 				}
-				
+
 
 			}
 
@@ -391,8 +391,8 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 		for(int i=startI; i<endI; ++i) {
 			float mean = params.get(this.mean, i);
 			float log_sdev = params.get(this.log_sd, i);
-//			float mult=params.get(this.mult, i);
-//			float add=this.hasAdd?params.get(this.add, i):0;
+			//			float mult=params.get(this.mult, i);
+			//			float add=this.hasAdd?params.get(this.add, i):0;
 			float scal = (float)Math.exp(-log_sdev);
 
 			//				int count=0;
@@ -423,7 +423,7 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 					float shifted = in_activation - mean;
 					float normalized = shifted*scal;
 					ðmult += normalized * ðout;
-					
+
 					ðmean += ðloss_lr * (-normalized*scal);
 					ðlog_sdev += ðloss_lr * (1 - normalized*normalized);
 				}
@@ -529,7 +529,6 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 				continue;
 			ActivationSet a = b.get(t);
 			//int_x (0.5*x²/sigma² + log(sigma)) *
-			double offset;
 			for(int i=startI; i<endI; ++i) {
 				float mean = params.get(this.mean, i);
 				float log_sdev = params.get(this.log_sd, i);
@@ -547,14 +546,14 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 					float normalized = (activation - mean)*scal;
 					lossContrib += normalized*normalized*0.5 + log_sdev - entropy;
 				}
-				
+
 
 			}
 			ret += lossContrib;
 		}
 		return ret;
 	}
-	
+
 	@Override
 	public double mapSigmaFromStorage(double s) {
 		return Math.exp(s);
@@ -563,5 +562,5 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 	public double mapSigmaToStorage(double s) {
 		return Math.log(s);
 	}
-	
+
 }

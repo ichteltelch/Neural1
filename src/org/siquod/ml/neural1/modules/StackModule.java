@@ -30,7 +30,7 @@ public class StackModule implements InOutModule{
 	ArrayList<Interface> hidden=new ArrayList<>();
 	public StackModule(){
 	}
-	
+
 	public StackModule addFinalLayer(InOutModule m){
 		return addLayer(m, (Interface)null);
 	}
@@ -115,7 +115,7 @@ public class StackModule implements InOutModule{
 			if(layers.get(i) instanceof InOutCastLayer)
 				hidden.get(i).offset=last.offset;
 			hidden.set(i, last=ia.allocate(hidden.get(i)));
-			
+
 		}
 		String lastName="in";
 		for(int i=0; i<layers.size(); ++i){
@@ -157,7 +157,7 @@ public class StackModule implements InOutModule{
 			String siname, soname;
 			if(si==in)siname="in";else if(si==out)siname="out"; else siname=si.name;
 			if(so==in)soname="in";else if(so==out)soname="out"; else soname=so.name;
-			
+
 			Copy cl=new Copy(0, null);
 			cl.width=width;
 			cl.allocate(ia, siname, soname);
@@ -169,7 +169,7 @@ public class StackModule implements InOutModule{
 			while(j<shortcuts.size() && shortcutIn.get(j)==l.getIn())
 				exec.add(shortcuts.get(j++));
 		}
-		
+
 
 	}
 
@@ -218,18 +218,18 @@ public class StackModule implements InOutModule{
 	}
 
 
-////	@Override
-//	public void declareDependencies(Dependencies d) {
-////		for(Module l: layers)
-////			l.declareDependencies(d);
-//	}
+	////	@Override
+	//	public void declareDependencies(Dependencies d) {
+	////		for(Module l: layers)
+	////			l.declareDependencies(d);
+	//	}
 
 	@Override
 	public void dontComputeInPhase(String phase) {
 		for(Interface h: hidden)
 			h.dontComputeInPhase(phase);
 	}
-//	@Override
+	//	@Override
 	public boolean wouldBackprop(String phase) {
 		return true;
 	}
