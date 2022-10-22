@@ -161,7 +161,7 @@ public class QuadraticInteraction implements InOutModule{
 		Kernel lastKernel = kernels[kernels.length-1];
 		assert leftLength == lastKernel.leftEnd;
 		assert rightLength == lastKernel.rightEnd;
-		assert outLength == lastKernel.outLength;
+		assert outLength == lastKernel.outEnd;
 		this.leftLength = leftLength;
 		this.rightLength = rightLength;
 		this.outLength = outLength;
