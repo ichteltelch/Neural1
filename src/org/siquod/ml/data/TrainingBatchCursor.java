@@ -560,6 +560,8 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 	 * @return
 	 */
 	public static TrainingBatchCursor polyInteractionFeatures(TrainingBatchCursor back, int order) {
+		if(order==1)
+			return back;
 		int bic = back.inputCount();
 		int eInp = bic;
 		for(int i=2; i<=order; ++i)
@@ -598,6 +600,8 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 	 * @return
 	 */
 	public static TrainingBatchCursor.RandomAccess polyInteractionFeatures(TrainingBatchCursor.RandomAccess back, int order) {
+		if(order==1)
+			return back;
 		int bic = back.inputCount();
 		int eInp = bic;
 		for(int i=2; i<=order; ++i)
@@ -609,12 +613,15 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 		return ramBuffer(this);
 	}
 	public static RamBuffer ramBuffer(TrainingBatchCursor of) {
+		if(of instanceof RamBuffer)
+			return ((RamBuffer)of).clone();
 		ArrayList<double[]> inputs=new ArrayList<>(); 
 		ArrayList<double[]> outputs=new ArrayList<>(); 
 		ArrayList<Double> weights=new ArrayList<>();
 		int ic = of.inputCount();
 		int oc = of.outputCount();
 		of.reset();
+		long count = 0;
 		while(!of.isFinished()) {
 			double[] i = new double[ic];
 			double[] o = new double[oc];
@@ -624,6 +631,10 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 			outputs.add(o);
 			weights.add(of.getWeight());
 			of.next();
+			if(count>=Integer.MAX_VALUE) {
+				throw new ArrayIndexOutOfBoundsException();
+			}
+			++count;
 		}
 		double[][] is = inputs.toArray(new double[inputs.size()][]);
 		double[][] os = outputs.toArray(new double[outputs.size()][]);
