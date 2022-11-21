@@ -36,6 +36,15 @@ public class DerivableMetricTracker implements MetricObserver{
 	public MetricTracker movingRobustAverage(int past, int future, double fraction) {
 		return new MRA_MetricTracker(id, metric, past, future, fraction, this);
 	}
+	public MA_MetricTracker movingAverage(int pastAndFuture) {
+		return new MA_MetricTracker(id, metric, pastAndFuture, pastAndFuture, this);
+	}
+	public MetricTracker movingMedian(int pastAndFuture) {
+		return new MM_MetricTracker(id, metric, pastAndFuture, pastAndFuture, this);
+	}
+	public MetricTracker movingRobustAverage(int pastAndFuture, double fraction) {
+		return new MRA_MetricTracker(id, metric, pastAndFuture, pastAndFuture, fraction, this);
+	}
 
 	public DerivedMetricObserver printer() {
 		return DerivedMetricObserver.printer(this);
