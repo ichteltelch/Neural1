@@ -538,6 +538,7 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 	
 		@Override
 		public boolean isFinished() {
+			ff();
 			return currentSequenceIndex>=sequences.length;
 		}
 	
@@ -647,6 +648,7 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 
 	public static class RamBuffer implements RandomAccess{
 		RamBuffer(double[][] is2, double[][] os2, double[] ws2, int at2, int ic, int oc) {
+			
 			is=is2;
 			os=os2;
 			ws=ws2;
@@ -664,6 +666,8 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 		}
 		@Override
 		public boolean isFinished() {
+//			if(is.length==0)
+//				System.out.println();
 			return at>=is.length;
 		}
 		@Override
