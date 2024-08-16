@@ -28,6 +28,28 @@ public class StackModule implements InOutModule{
 	ArrayList<Copy> shortcuts=new ArrayList<>();
 	Interface in, out;
 	ArrayList<Interface> hidden=new ArrayList<>();
+
+	public StackModule(StackModule copyThis){
+		for(InOutModule layer: copyThis.layers) {
+			layers.add(layer.copy());
+		}
+		shortcutIn.addAll(copyThis.shortcutIn);
+		shortcutOut.addAll(copyThis.shortcutOut);
+		shortcutWidth.addAll(copyThis.shortcutWidth);
+		for(Copy c: copyThis.shortcuts) {
+			shortcuts.add(c.copy());
+		}
+		in=copyThis.in;
+		out=copyThis.out;
+		hidden.addAll(copyThis.hidden);
+		makeExec();
+	}
+
+	@Override
+	public StackModule copy() {
+		return new StackModule(this);
+	}
+
 	public StackModule(){
 	}
 
@@ -163,14 +185,18 @@ public class StackModule implements InOutModule{
 			cl.allocate(ia, siname, soname);
 			shortcuts.add(cl);
 		}
+		makeExec();
+
+
+	}
+
+	private void makeExec() {
 		for(int i=0, j=0; i<layers.size(); ++i) {
 			InOutModule l = layers.get(i);
 			exec.add(l);
 			while(j<shortcuts.size() && shortcutIn.get(j)==l.getIn())
 				exec.add(shortcuts.get(j++));
 		}
-
-
 	}
 
 	@Override

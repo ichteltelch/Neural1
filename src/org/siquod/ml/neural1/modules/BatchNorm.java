@@ -24,6 +24,23 @@ public class BatchNorm extends BatchNormoid{
 	private Interface out;
 	private Interface mean, var;
 	boolean hasAdd=true;
+	ParamBlock add, mult;
+	TensorFormat tf;
+	public BatchNorm(BatchNorm copyThis) {
+		super(copyThis);
+		this.in = copyThis.in;
+        this.out = copyThis.out;
+        this.mean = copyThis.mean;
+        this.var = copyThis.var;
+        this.hasAdd = copyThis.hasAdd;
+        this.add = copyThis.add;
+        this.mult = copyThis.mult;
+        this.tf = copyThis.tf;
+	}
+	@Override
+	public BatchNorm copy() {
+		return this;
+	}
 
 	public BatchNorm(boolean hasAdd) {
 		this.hasAdd=hasAdd;
@@ -31,8 +48,6 @@ public class BatchNorm extends BatchNormoid{
 	public BatchNorm() {
 		this(true);
 	}
-	ParamBlock add, mult;
-	TensorFormat tf;
 	@Override TensorFormat tf() {return tf;}
 
 	@Override

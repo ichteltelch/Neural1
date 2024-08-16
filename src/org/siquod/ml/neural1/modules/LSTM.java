@@ -43,6 +43,54 @@ public class LSTM implements InOutModule{
 	Module[] exec;
 	int dt=-1;
 	int[] shift;
+	
+	
+	public LSTM(LSTM copyThis) {
+		this.c = copyThis.c;
+		this.g1 = copyThis.g1.copy();
+		this.g2 = copyThis.g2.copy();
+		this.g3 = copyThis.g3.copy();
+		this.s1 = copyThis.s1.copy();
+		this.s2 = copyThis.s2.copy();
+		this.s3 = copyThis.s3.copy();
+		this.t1 = copyThis.t1.copy();
+		this.t2 = copyThis.t2.copy();
+		this.four = copyThis.four;
+		this.split = copyThis.split.copy();
+		this.s1o = copyThis.s1o;
+		this.s2o = copyThis.s2o;
+		this.s3o = copyThis.s3o;
+		this.t1o = copyThis.t1o;
+		this.t2o = copyThis.t2o;
+		this.s1i = copyThis.s1i;
+		this.s2i = copyThis.s2i;
+		this.s3i = copyThis.s3i;
+		this.t1i = copyThis.t1i;
+		this.hi = copyThis.hi;
+		this.trunc = copyThis.trunc.copy();
+		this.hMat = copyThis.hMat.copy();
+		this.xMat = copyThis.xMat.copy();
+		this.in = copyThis.in;
+		this.out = copyThis.out;
+		initExec();
+		this.dt=copyThis.dt;
+		this.shift=copyThis.shift!=null?copyThis.shift.clone():null;
+	}
+	@Override
+	public LSTM copy() {
+		return new LSTM(this);
+	}
+	private void initExec() {
+		exec=new Module[] {
+//				trunc, hMat, //Must be first for BP truncation to work
+				xMat, 
+				split,
+				s1, s2, s3, t1,
+				g1, g2, 
+				t2, 
+				g3
+		};
+	}
 	/**
 	 * The xMat module connects the input from the lower layer to the nonlinearities.
 	 * The hMat module connects to past output of the LSTM cells to the nonlinearities.
@@ -105,26 +153,7 @@ public class LSTM implements InOutModule{
 		t2.allocate(ia, "c", "t2o");
 		g3.allocate(ia, "s3o", "t2o", "out");
 
-		// in -> xMat -> 4
-		// 4 -> {s1i, s2i, t1i, s3i}
-		// s1i -> s1 -> s1o
-		// s2i -> s2 -> s2o
-		// s3i -> s3 -> s3o
-		// t1i -> t1 -> t1o
-		// {c-, s1o} -> g1 -> c
-		// {s2o, t1o} -> g2 -> c
-		// c -> t2 -> t2o
-		// {s3o, t2o} -> g3 -> out
-		// out- -> hMat -> 4
-		exec=new Module[] {
-//				trunc, hMat, //Must be first for BP truncation to work
-				xMat, 
-				split,
-				s1, s2, s3, t1,
-				g1, g2, 
-				t2, 
-				g3
-		};
+		initExec();
 	}
 
 	@Override

@@ -14,6 +14,18 @@ public abstract class BatchNormoid extends AbstractBatchNorm{
 
 	protected FinalizationMode finalizationMode = FinalizationMode.NORMAL;
 	int instanceCount;
+	
+	public BatchNormoid(BatchNormoid copyThis) {
+		this.runningMean = copyThis.runningMean;
+		this.runningSdev = copyThis.runningSdev;
+		this.finalizationMode = copyThis.finalizationMode;
+		this.instanceCount = copyThis.instanceCount;
+	}
+	public BatchNormoid() {
+		
+	}
+
+	
 	public void setMode(FinalizationMode m, ParamSet p) {
 		if(finalizationMode==m)
 			return;
@@ -68,4 +80,7 @@ public abstract class BatchNormoid extends AbstractBatchNorm{
 	public ParamBlock meanStorage() {
 		return runningMean;
 	}
+	@Override
+	public abstract AbstractBatchNorm copy();
+	
 }

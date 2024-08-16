@@ -24,6 +24,16 @@ public class StochasticDepthSwitch implements InOutModule{
 	public int dropoutOffset=-1;
 	Interface out;
 	InOutModule inner;
+	public StochasticDepthSwitch(StochasticDepthSwitch copyThis) {
+		keepProbability=copyThis.keepProbability;
+		dropoutOffset=copyThis.dropoutOffset;
+		inner=copyThis.inner.copy();
+		out=copyThis.out;
+    }
+	@Override
+    public StochasticDepthSwitch copy() {
+        return new StochasticDepthSwitch(this);
+    }
 	public StochasticDepthSwitch(InOutModule i, double p) {
 		keepProbability=(float) p;
 		inner = i;

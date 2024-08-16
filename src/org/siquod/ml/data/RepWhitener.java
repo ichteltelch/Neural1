@@ -12,6 +12,20 @@ public class RepWhitener implements Whitener{
 	public final int repetitions;
 	public final RepIndexer indexer;
 	final int chs;
+	public RepWhitener(RepWhitener copyThis) {
+		this.base=copyThis.base.copy();
+        this.repetitions = copyThis.repetitions;
+        this.indexer=copyThis.indexer;
+        chs = copyThis.chs;
+        this.inBufferD = copyThis.inBufferD.clone();
+        this.outBufferD = copyThis.outBufferD.clone();
+        this.inBufferF = copyThis.inBufferF.clone();
+        this.outBufferF = copyThis.outBufferF.clone();
+	}
+	@Override
+	public RepWhitener copy() {
+		return new RepWhitener(this);
+	}
 	public RepWhitener(Whitener base, int repetitions, RepIndexer repi) {
 		this.base=base;
 		this.repetitions = repetitions;

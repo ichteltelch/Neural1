@@ -30,6 +30,19 @@ public class Copy implements InOutModule{
 	TensorFormat inTf, outTf;
 	HashSet<String> dontBackprop=new HashSet<>();
 	public int width=-1;
+	public Copy(Copy o) {
+		this.dt=o.dt;
+        this.shift=o.shift==null?null:o.shift.clone();
+        this.posi=o.posi==null?null:o.posi.clone();
+        this.in=o.in;
+        this.out=o.out;
+        this.inTf=o.inTf;
+        this.outTf=o.outTf;
+        this.dontBackprop=new HashSet<>(o.dontBackprop);
+	}
+	public Copy copy() {
+		return new Copy(this);
+	}
 	public Copy(int dt, int... shift){
 		this.dt=dt;
 		this.shift=shift==null?null:shift.clone();

@@ -28,6 +28,14 @@ public class Nonlin implements InOutModule{
 	public Nonlin(Neuron n){
 		this.n=n;
 	}
+	public Nonlin(Nonlin copyThis) {
+		this.n=copyThis.n;
+		this.in=copyThis.in;
+		this.out=copyThis.out;
+	}
+	public Nonlin copy() {
+		return this;
+	}
 
 	@Override
 	public void allocate(InterfaceAllocator ia) {

@@ -20,12 +20,17 @@ public interface Whitener {
 	void whiten(float[] in, float[] out);
 	int dim();
 	
+	Whitener copy();
+	
 	public default RepWhitener rep(int repetitions, RepIndexer repi) {
 		return new RepWhitener(this, repetitions, repi);
 	}
 	static class GaussianWhitener implements Whitener{
 		public final double[] µ;
 		public final double[] invSigma;
+		public GaussianWhitener copy() {
+			return this;
+		}
 		public GaussianWhitener(double[] µ, double[] invSigma) {
 			this.µ=µ;
 			this.invSigma=invSigma;
@@ -121,6 +126,9 @@ public interface Whitener {
 	static class MultivariateGaussianWhitener implements Whitener{
 		public final double[] µ;
 		public final double[][] invSigma;
+		public MultivariateGaussianWhitener copy() {
+            return this;
+        }
 		public MultivariateGaussianWhitener(double[] µ, double[][] invSigma) {
 			this.µ=µ;
 			this.invSigma=invSigma;

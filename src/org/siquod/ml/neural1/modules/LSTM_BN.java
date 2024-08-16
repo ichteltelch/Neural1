@@ -43,9 +43,53 @@ public class LSTM_BN implements InOutModule{
 	BackpropStopper trunc;
 	InOutModule hMat, xMat;
 	Interface in, out;
+	Copy cl;
 	Module[] exec;
 	int dt=-1;
 	int[] shift;
+	
+	public LSTM_BN(LSTM_BN copyThis) {
+		this.c = copyThis.c;
+        this.g1 = copyThis.g1.copy();
+        this.g2 = copyThis.g2.copy();
+        this.g3 = copyThis.g3.copy();
+        this.s1 = copyThis.s1.copy();
+        this.s2 = copyThis.s2.copy();
+        this.s3 = copyThis.s3.copy();
+        this.t1 = copyThis.t1.copy();
+        this.t2 = copyThis.t2.copy();
+        this.bnx = copyThis.bnx.copy();
+        this.bnh = copyThis.bnh.copy();
+        this.bno = copyThis.bno.copy();
+        this.four_h = copyThis.four_h;
+        this.four_x = copyThis.four_x;
+        this.four = copyThis.four;
+        this.split = copyThis.split.copy();
+        this.s1o = copyThis.s1o;
+        this.s2o = copyThis.s2o;
+        this.s3o = copyThis.s3o;
+        this.t1o = copyThis.t1o;
+        this.t2o = copyThis.t2o;
+        this.s1i = copyThis.s1i;
+        this.s2i = copyThis.s2i;
+        this.s3i = copyThis.s3i;
+        this.t1i = copyThis.t1i;
+        this.t2i = copyThis.t2i;
+        this.hi = copyThis.hi;
+        this.trunc = copyThis.trunc.copy();
+        this.hMat = copyThis.hMat.copy();
+        this.xMat = copyThis.xMat.copy();
+        this.in = copyThis.in;
+        this.out = copyThis.out;
+        this.cl = copyThis.cl.copy();
+		makeExec();
+		this.dt=copyThis.dt;
+		this.shift=copyThis.shift!=null?copyThis.shift.clone():null;
+	}
+	@Override
+	public LSTM_BN copy() {
+		return new LSTM_BN(this);
+	}
 	public LSTM_BN(InOutModule hMat, InOutModule xMat){
 		this(true, hMat, xMat);
 	}
@@ -109,7 +153,7 @@ public class LSTM_BN implements InOutModule{
 		t1o=ia.allocate(new Interface("t1o", s));
 		t2o=ia.allocate(new Interface("t2o", s));
 		Interface copy;
-		Copy cl=null;
+		cl=null;
 		if(!! true) {
 			cl=new Copy(dt, shift);
 			copy=ia.allocate(new Interface("outcopy", out.tf));
@@ -155,6 +199,9 @@ public class LSTM_BN implements InOutModule{
 		// {s3o, t2o} -> g3 -> out
 		// out- -> hMat -> 4
 
+		makeExec();
+	}
+	private void makeExec() {
 		exec=new Module[] {
 				cl,  
 				trunc, 

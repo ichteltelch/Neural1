@@ -69,4 +69,6 @@ public abstract class AbstractBatchNorm implements InOutScaleBiasModule {
 			rec.setNormalizerParameters(eval.getParams());
 		}
 	}
+	@Override
+	public abstract AbstractBatchNorm copy();
 }

@@ -35,6 +35,30 @@ public class BatchReNorm extends BatchNormoid{
 
 	Function<Integer, Float> rmaxSchedule=rmaxSchedule(100);
 	Function<Integer, Float> dmaxSchedule=dmaxSchedule(100);
+	
+	public BatchReNorm(BatchReNorm copyThis) {
+		super(copyThis);
+		this.in = copyThis.in;
+		this.out = copyThis.out;
+		this.mean = copyThis.mean;
+		this.sdev= copyThis.sdev;
+		this.hasAdd = copyThis.hasAdd;
+		this.add = copyThis.add;
+		this.mult = copyThis.mult;
+		this.age = copyThis.age;
+		this.hasAdd = copyThis.hasAdd;
+		this.broadcast = copyThis.broadcast;
+		this.par=copyThis.par;
+		this.tf=copyThis.tf;
+		this.rmaxSchedule=copyThis.rmaxSchedule;
+		this.dmaxSchedule=copyThis.dmaxSchedule;
+	}
+	@Override
+	public BatchReNorm copy() {
+		return this;
+	}
+	
+	
 	public float learnRateMultiplier() {return (float)0;}
 	@Override TensorFormat tf() {return tf;}
 

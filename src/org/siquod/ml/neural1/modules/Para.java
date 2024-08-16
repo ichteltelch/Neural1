@@ -17,6 +17,18 @@ public class Para implements InOutModule{
 	InOutModule[] exec;
 	private Interface in;
 	private Interface out;
+	public Para(Para copyThis) {
+		exec=Arrays.copyOf(copyThis.exec, copyThis.exec.length);
+		for(int i=0; i<exec.length; ++i) {
+			exec[i]=copyThis.exec[i].copy();
+		}
+		this.in=copyThis.in;
+		this.out=copyThis.out;
+    }
+	@Override
+	public InOutModule copy() {
+		return new Para(this);
+	}
 	public Para(InOutModule... sub) {
 		exec=sub.clone();
 	}

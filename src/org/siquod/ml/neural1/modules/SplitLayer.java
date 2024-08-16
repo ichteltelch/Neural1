@@ -28,6 +28,15 @@ public class SplitLayer implements NopCastLayer{
 	public SplitLayer(){
 
 	}
+	public SplitLayer(SplitLayer copyThis) {
+		this.in=copyThis.in;
+		this.out=new ArrayList<>(copyThis.out);
+		this.offsets=new ArrayList<>(copyThis.offsets);
+	}
+	@Override
+	public SplitLayer copy() {
+		return this;
+	}
 	public SplitLayer output(int offset, Interface i){
 		if(i==null)
 			throw new NullPointerException();
@@ -75,17 +84,17 @@ public class SplitLayer implements NopCastLayer{
 	@Override
 	public void backprop(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, int t, int[] inst) {
 	}
-////	@Override
-//	public void declareDependencies(Dependencies d) {
-//		d.declare(new InputDependency(in, this, 0));
-//		for(Interface o: out)
-//			d.declare(new OutputDependency(this, o));			
-//	}
+	////	@Override
+	//	public void declareDependencies(Dependencies d) {
+	//		d.declare(new InputDependency(in, this, 0));
+	//		for(Interface o: out)
+	//			d.declare(new OutputDependency(this, o));			
+	//	}
 	@Override
 	public void dontComputeInPhase(String phase) {
 
 	}
-//	@Override
+	//	@Override
 	public boolean wouldBackprop(String phase) {
 		return true;
 	}

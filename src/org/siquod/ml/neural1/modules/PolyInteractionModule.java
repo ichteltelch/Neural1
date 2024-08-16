@@ -23,6 +23,20 @@ public class PolyInteractionModule implements InOutModule{
 	Interface in;
 	Interface out;
 	public int width=-1;
+	public PolyInteractionModule(PolyInteractionModule copyThis){
+		this.order=copyThis.order;
+		this.in=copyThis.in;
+		this.out=copyThis.out;
+		this.width=copyThis.width;
+		inBuffer = new float[in.count];
+		outBuffer=new float[out.count];
+		dInBuffer=new float[in.count];
+		dOutBuffer=new float[out.count];
+	}
+	@Override
+	public InOutModule copy() {
+		return new PolyInteractionModule(this);
+	}
 	public PolyInteractionModule(int order){
 		this.order=order;
 	}

@@ -29,7 +29,20 @@ public class GateLayer implements Module{
 	int[] shift2;
 	int[] posi2;
 
-
+	public GateLayer(GateLayer copyThis) {
+		this.in1=copyThis.in1;
+		this.in2=copyThis.in2;
+		this.out=copyThis.out;
+		this.dt1=copyThis.dt1;
+		this.dt2=copyThis.dt2;
+		this.shift1=copyThis.shift1==null?null:copyThis.shift1.clone();
+		posi1=shift1==null?null:new int[shift1.length];
+		this.shift2=copyThis.shift2==null?null:copyThis.shift2.clone();
+		posi2=shift2==null?null:new int[shift2.length]; 
+    }
+	public GateLayer copy() {
+		return new GateLayer(this);
+	}
 	public GateLayer(){
 		this(0, 0, null, null);
 	}

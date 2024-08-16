@@ -30,6 +30,16 @@ public class LogSoftmax implements InOutModule{
 
 	LossGroup[] lgs;
 
+	public LogSoftmax(LogSoftmax copyThis) {
+		this.in=copyThis.in;
+		this.out=copyThis.out;
+		this.tf=copyThis.tf;
+		this.lgs=copyThis.lgs;
+	}
+	@Override
+	public LogSoftmax copy() {
+		return this;
+	}
 	public LogSoftmax(LossGroup... lgs) {
 		this.lgs=lgs;
 	}

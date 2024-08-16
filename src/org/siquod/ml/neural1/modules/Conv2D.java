@@ -35,6 +35,40 @@ public class Conv2D implements InOutBiasModule{
 	int fwx, fwy;
 	int frx, fry;
 	int dt;
+	float xBiasShift, yBiasShift;
+	float xBiasScale, yBiasScale;
+
+	public Conv2D(Conv2D copyThis) {
+		this.in = copyThis.in;
+		this.out = copyThis.out;
+		this.inf = copyThis.inf;
+		this.outf = copyThis.outf;
+		this.weights = copyThis.weights;
+		this.bias = copyThis.bias;
+		this.xBias = copyThis.xBias;
+		this.yBias = copyThis.yBias;
+		this.reg = copyThis.reg;
+		this.useBias = copyThis.useBias;
+		this.useCoordinateBias = copyThis.useCoordinateBias;
+		this.inChannels = copyThis.inChannels;
+		this.outChannels = copyThis.outChannels;
+		this.inWx = copyThis.inWx;
+		this.outWx = copyThis.outWx;
+		this.inWy = copyThis.inWy;
+		this.outWy = copyThis.outWy;
+		this.fwx = copyThis.fwx;
+		this.fwy = copyThis.fwy;
+		this.frx = copyThis.frx;
+		this.fry = copyThis.fry;
+		this.dt = copyThis.dt;
+		this.xBiasShift = copyThis.xBiasShift;
+		this.xBiasScale = copyThis.xBiasScale;
+		this.yBiasShift = copyThis.yBiasShift;
+		this.yBiasScale = copyThis.yBiasScale;
+	}
+	public Conv2D copy() {
+		return this;
+	}
 	public Conv2D(int fr){
 		this(fr, fr);
 	}
@@ -48,8 +82,6 @@ public class Conv2D implements InOutBiasModule{
 		dt=d;
 		return this;
 	}
-	float xBiasShift, yBiasShift;
-	float xBiasScale, yBiasScale;
 	@Override
 	public void allocate(InterfaceAllocator ia) {
 		in = ia.get("in");

@@ -1,5 +1,6 @@
 package org.siquod.ml.neural1.modules.loss;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -21,6 +22,18 @@ public class L2Loss extends LossLayer{
 	List<String> phases;
 	LossGroup[] lgs;
 	TensorFormat tf;
+	
+	public L2Loss(L2Loss copyThis) {
+        this.in=copyThis.in;
+        this.target=copyThis.target;
+        this.loss=copyThis.loss;
+        this.phases=new ArrayList<String>(copyThis.phases);
+        this.lgs=copyThis.lgs;
+        this.tf=copyThis.tf;
+    }
+	public L2Loss copy() {
+		return new L2Loss(this);
+	}
 
 	public L2Loss(String... ph) {
 		this(null, ph);

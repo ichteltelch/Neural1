@@ -43,6 +43,31 @@ public class QuadraticInteraction implements InOutModule{
 	int leftLength;
 	int rightLength;
 	int outLength;
+	public QuadraticInteraction(QuadraticInteraction copyThis) {
+		this.in = copyThis.in;
+		this.out = copyThis.out;
+		this.leftFactory = copyThis.leftFactory;
+		this.rightFactory = copyThis.rightFactory;
+		this.afterFactory = copyThis.afterFactory;
+		this.leftModule = copyThis.leftModule.copy();
+		this.rightModule = copyThis.rightModule.copy();
+		this.afterModule = copyThis.afterModule.copy();
+		this.leftFactors = copyThis.leftFactors;
+		this.rightFactors = copyThis.rightFactors;
+		this.products = copyThis.products;
+		this.in2d = copyThis.in2d;
+		this.product2d = copyThis.product2d;
+		this.left2d = copyThis.left2d;
+		this.right2d = copyThis.right2d;
+		makeExec();
+		this.kernels= copyThis.kernels;
+		this.leftLength= copyThis.leftLength;
+		this.rightLength= copyThis.rightLength;
+		this.outLength= copyThis.outLength;
+	}
+	public QuadraticInteraction copy() {
+		return new QuadraticInteraction(this);
+	}
 	public static QuadraticInteractionBuilder b() {
 		return new QuadraticInteractionBuilder();
 	}
@@ -148,6 +173,9 @@ public class QuadraticInteraction implements InOutModule{
 		rightModule.allocate(ia, "in", "right");
 		afterModule.allocate(ia, "products", "out");
 
+		makeExec();
+	}
+	private void makeExec() {
 		exec = new Module[] {
 				leftModule, rightModule, afterModule,
 		};

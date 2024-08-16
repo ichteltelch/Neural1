@@ -22,10 +22,21 @@ public class MaxPooling1D implements InOutModule{
 	private TensorFormat inf;
 	private TensorFormat outf;
 	int factor=2;
-	float[] select;
-	{
-		select=new float[factor];
+	public MaxPooling1D(MaxPooling1D copyThis) {
+		this.in=copyThis.in;
+        this.out=copyThis.out;
+        this.inf=copyThis.inf;
+        this.outf=copyThis.outf;
 	}
+	public MaxPooling1D() {
+		
+	}
+
+	@Override
+	public InOutModule copy() {
+		return this;
+	}
+
 	@Override
 	public void allocate(InterfaceAllocator ia) {
 		in = ia.get("in");

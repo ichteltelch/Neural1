@@ -23,6 +23,17 @@ public class Dropout extends InOutCastLayer{
 
 
 	Random r;
+	public Dropout(Dropout copyThis) {
+        super(copyThis);
+        this.keepProbability=copyThis.keepProbability;
+        this.dropoutOffset=copyThis.dropoutOffset;
+        this.tf=copyThis.tf;
+        this.r=new Random(copyThis.r.nextLong());
+    }
+	@Override
+	public Dropout copy() {
+		return new Dropout(this);
+	}
 	public Dropout(Interface in2, double p, Random r, boolean perChannel) {
 		super(in2);
 		keepProbability=(float) p;

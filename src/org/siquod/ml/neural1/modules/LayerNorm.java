@@ -24,6 +24,18 @@ public class LayerNorm implements InOutScaleBiasModule{
 	ParamBlock add, mult;
 	private boolean hasAdd=true;
 
+	
+	public LayerNorm(LayerNorm copyThis) {
+		this.in = copyThis.in;
+        this.out = copyThis.out;
+        this.stat = copyThis.stat;
+        this.add = copyThis.add;
+        this.mult = copyThis.mult;
+        this.hasAdd=copyThis.hasAdd;
+	}
+	public LayerNorm copy() {
+		return this;
+	}
 	public LayerNorm() {
 		this(true);
 	}

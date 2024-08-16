@@ -1,5 +1,6 @@
 package org.siquod.ml.neural1.modules.loss;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +31,20 @@ public class NllLoss extends LossLayer{
 	List<String> phases;
 	LossGroup[] lgs;
 	TensorFormat tf;
+
+	public NllLoss(NllLoss copyThis) {
+		this.in=copyThis.in;
+		this.target=copyThis.target;
+		this.loss=copyThis.loss;
+		this.phases=new ArrayList<String>(copyThis.phases);
+		this.lgs=copyThis.lgs;
+		this.tf=copyThis.tf;
+
+	}
+	@Override
+	public NllLoss copy() {
+		return new NllLoss(this);
+	}
 
 	public NllLoss(String... ph) {
 		this(null, ph);
@@ -125,9 +140,9 @@ public class NllLoss extends LossLayer{
 							if (trg<=0) continue;
 							double pp = a.get(in, index);
 							rr += trg*(Math.log(trg)-pp);
-//							if(!Float.isFinite(rr)) {
-//								System.out.println();
-//							}
+							//							if(!Float.isFinite(rr)) {
+							//								System.out.println();
+							//							}
 
 						}
 					}
@@ -164,13 +179,13 @@ public class NllLoss extends LossLayer{
 						gate = lg.weight;
 					}
 					float ge = gate*e;
-					
+
 					if(lg.isSingleton()) {
 						int i = lg.start;
 						int index = tf.index(bri, i);
 						float trg = a.get(target, index);
 						float pp = a.get(in, index);
-						
+
 						float ppe=0;
 						if (trg>0) {
 							ppe += trg*(-1/(pp));
@@ -184,23 +199,23 @@ public class NllLoss extends LossLayer{
 						es.add(in, index, ppe*ge);
 
 					}else {
-//						for(int i=lg.start; i<lg.end; i++){
-//							int index = tf.index(bri, i);
-//							double trg = a.get(target, index);
-//							if (trg<=0) continue;
-//							double pp = a.get(in, index);
-//							rr += trg*(Math.log(trg)-pp);
-//							if(!Float.isFinite(rr)) {
-//								System.out.println();
-//							}
-//
-//						}
+						//						for(int i=lg.start; i<lg.end; i++){
+						//							int index = tf.index(bri, i);
+						//							double trg = a.get(target, index);
+						//							if (trg<=0) continue;
+						//							double pp = a.get(in, index);
+						//							rr += trg*(Math.log(trg)-pp);
+						//							if(!Float.isFinite(rr)) {
+						//								System.out.println();
+						//							}
+						//
+						//						}
 						for(int i=lg.start; i<lg.end; i++){
 							int index = tf.index(bri, i);
 							es.add(in, index, -a.get(target, index)*ge);
 						}	
 					}
-					
+
 
 				}
 			}

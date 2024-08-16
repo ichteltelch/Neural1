@@ -16,4 +16,6 @@ public abstract class LossLayer implements Module{
 		allocate(ia);
 		ia.pop();
 	}
+	@Override
+	public abstract LossLayer copy();
 }

@@ -26,6 +26,21 @@ public class StochasticPooling1D implements InOutModule{
 	{
 		select=new float[factor];
 	}
+	public StochasticPooling1D() {
+		
+	}
+	public StochasticPooling1D(StochasticPooling1D copyThis) {
+		this.in=copyThis.in;
+        this.out=copyThis.out;
+        this.inf=copyThis.inf;
+        this.outf=copyThis.outf;
+        this.factor=copyThis.factor;
+        this.select=copyThis.select.clone();
+	}
+	@Override
+	public StochasticPooling1D copy() {
+		return new StochasticPooling1D(this);
+	}
 	@Override
 	public void allocate(InterfaceAllocator ia) {
 		in = ia.get("in");

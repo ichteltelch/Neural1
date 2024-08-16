@@ -37,7 +37,26 @@ public class BatchlessNorm extends AbstractBatchNorm{
 	double lr = defaultLrMult;
 	@Override
 	public float learnRateMultiplier() {return (float)lr;}
-
+	public BatchlessNorm(BatchlessNorm copyThis) {
+		this.in = copyThis.in;
+		this.out = copyThis.out;
+		this.loss = copyThis.loss;
+		this.mean = copyThis.mean;
+		this.sd = copyThis.sd;
+		this.add = copyThis.add;
+		this.mult = copyThis.mult;
+		this.age = copyThis.age;
+		this.hasAdd=copyThis.hasAdd;
+		this.broadcast=copyThis.broadcast;
+		this.par=copyThis.par;
+		this.tf=copyThis.tf;
+		this.lossSupplier=copyThis.lossSupplier;
+		this.gradmul=copyThis.gradmul;
+		this.lr=copyThis.lr;
+	}
+	public BatchlessNorm copy() {
+		return this;
+	}
 
 	public BatchlessNorm(boolean hasAdd, boolean broadcast, Supplier<? extends Interface> lossSupplier) {
 		this.hasAdd=hasAdd;

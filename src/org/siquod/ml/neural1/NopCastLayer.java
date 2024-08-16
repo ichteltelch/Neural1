@@ -7,5 +7,6 @@ package org.siquod.ml.neural1;
  *
  */
 public interface NopCastLayer extends Module{
-
+	@Override
+	NopCastLayer copy();
 }

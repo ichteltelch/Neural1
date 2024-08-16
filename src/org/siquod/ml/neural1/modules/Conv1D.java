@@ -33,6 +33,33 @@ public class Conv1D implements InOutBiasModule{
 	int fwx;
 	int frx;
 	int dt;
+	float xBiasShift;
+	float xBiasScale;
+	
+	public Conv1D(Conv1D copyThis) {
+		this.in = copyThis.in;
+        this.out = copyThis.out;
+        this.inf = copyThis.inf;
+        this.outf = copyThis.outf;
+        this.weights = copyThis.weights;
+        this.bias = copyThis.bias;
+        this.xBias = copyThis.xBias;
+        this.reg = copyThis.reg;
+        this.useBias = copyThis.useBias;
+        this.useCoordinateBias = copyThis.useCoordinateBias;
+        this.inChannels = copyThis.inChannels;
+        this.outChannels = copyThis.outChannels;
+        this.inWx = copyThis.inWx;
+        this.outWx = copyThis.outWx;
+        this.fwx = copyThis.fwx;
+        this.frx = copyThis.frx;
+        this.dt = copyThis.dt;
+        this.xBiasShift = copyThis.xBiasShift;
+        this.xBiasScale = copyThis.xBiasScale;
+	}
+	public Conv1D copy() {
+		return this;
+	}
 	public Conv1D(int fr){
 		this.frx=fr;
 		fwx=frx*2+1;
@@ -41,8 +68,6 @@ public class Conv1D implements InOutBiasModule{
 		dt=d;
 		return this;
 	}
-	float xBiasShift;
-	float xBiasScale;
 	@Override
 	public void allocate(InterfaceAllocator ia) {
 		in = ia.get("in");

@@ -22,6 +22,23 @@ public class Switch implements InOutModule{
 	InOutModule inner;
 	Interface in, out;
 	
+	public Switch(Switch copyThis) {
+		gradientPhases=copyThis.gradientPhases;
+        backpropPhases=copyThis.backpropPhases;
+        forwardPhases=copyThis.forwardPhases;
+        inner=copyThis.inner.copy();
+        out=copyThis.out;
+        in=copyThis.in;
+	}
+	@Override
+	public InOutModule copy() {
+		return new Switch(this);
+	}
+	
+	public Switch() {
+		
+	}
+	
 	@Override
 	public void allocate(InterfaceAllocator ia) {
 		in=ia.get("in");

@@ -7,6 +7,11 @@ import org.siquod.ml.neural1.InterfaceAllocator;
 public abstract class InOutCastLayer implements InOutModule{
 	Interface in;
 	Interface out;
+	
+	public InOutCastLayer(InOutCastLayer copyThis) {
+        this.in=copyThis.in;
+        this.out=copyThis.out;
+    }
 	public InOutCastLayer(Interface in2) {
 		in=in2;
 	}

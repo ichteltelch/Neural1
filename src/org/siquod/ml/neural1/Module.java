@@ -8,6 +8,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 
+import org.siquod.ml.neural1.modules.InOutModule;
+
 public interface Module {
 	public static final ExecutorService parallelizer = Executors.newCachedThreadPool(); 
 
@@ -18,9 +20,9 @@ public interface Module {
 	ParamBlocks getParamBlocks();
 	void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst);
 	void backprop(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, int t, int[] inst);
-//	public void declareDependencies(Dependencies d);
+	//	public void declareDependencies(Dependencies d);
 	public void dontComputeInPhase(String phase);
-//	public boolean wouldBackprop(String phase);
+	//	public boolean wouldBackprop(String phase);
 
 	static void add(int[] in1, int[] in2, int[] out) {
 		for(int i=0; i<in1.length; ++i)
@@ -53,9 +55,9 @@ public interface Module {
 			m.updateStatistics(stat, params, owt, weight, tMin);
 	}
 	//	default void initializeBatch(ActivationSeq as) {
-//		for(Module m: getSubmodules())
-//			m.initializeBatch(as);
-//	}
+	//		for(Module m: getSubmodules())
+	//			m.initializeBatch(as);
+	//	}
 	default void initializeRun(ActivationBatch as, boolean training) {
 		for(Module m: getSubmodules())
 			m.initializeRun(as, training);
@@ -90,4 +92,11 @@ public interface Module {
 			throw new RuntimeException(e);
 		}
 	}
+	/**
+	 * Make a copy with no shared inference-time state
+	 * @return
+	 */
+	public abstract Module copy();
 }
+
+

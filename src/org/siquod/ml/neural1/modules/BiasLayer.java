@@ -17,6 +17,14 @@ import org.siquod.ml.neural1.ParamSet;
 
 public class BiasLayer extends InOutCastLayer implements HasBias{
 	ParamBlock bias;
+	public BiasLayer(BiasLayer copyThis) {
+		super(copyThis);
+        bias=copyThis.bias;
+	}
+	@Override
+	public BiasLayer copy() {
+		return this;
+	}
 	public BiasLayer(Interface in2) {
 		super(in2);
 		out=new Interface(in.count, in.tf);

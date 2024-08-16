@@ -32,7 +32,22 @@ public class ParameterizedNonlin implements InOutModule{
 	public ParameterizedNonlin(ParameterizedNeuron n){
 		this(n, 0, 1, 0.000001f, 0.001f);
 	}
+	public ParameterizedNonlin(ParameterizedNonlin copyThis) {
+		this.n=copyThis.n;
+		this.min = copyThis.min;
+		this.max = copyThis.max;
+		this.regL1 = copyThis.regL1;
+		this.regL2 = copyThis.regL2;
+		this.in = copyThis.in;
+		this.out = copyThis.out;
+		this.alpha = copyThis.alpha;
+		this.tf = copyThis.tf;
+    }
 
+	@Override
+	public InOutModule copy() {
+		return this;
+	}
 	public ParameterizedNonlin(ParameterizedNeuron n, float min, float max, float regL1, float regL2){
 		this.n=n;
 		this.min = min;

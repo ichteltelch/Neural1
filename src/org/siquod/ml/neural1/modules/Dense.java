@@ -43,6 +43,30 @@ public class Dense implements InOutBiasModule{
 	Regularizer reg;
 
 	int par = 1;
+	
+	public Dense(Dense copyThis) {
+		this.in = copyThis.in;
+        this.out = copyThis.out;
+        this.weights = copyThis.weights;
+        this.bias = copyThis.bias;
+        if(copyThis.coordinateBias!=null){
+            this.coordinateBias=copyThis.coordinateBias.clone();
+        }
+        this.shift=copyThis.shift!=null?copyThis.shift.clone():null;
+        this.posi=copyThis.posi!=null?copyThis.posi.clone():null;
+        this.coordinateActivations=copyThis.coordinateActivations!=null?copyThis.coordinateActivations.clone():null;
+        this.useBias=copyThis.useBias;
+        this.useCoordinateBias=copyThis.useCoordinateBias;
+        this.biasInit=copyThis.biasInit;
+        this.dt=copyThis.dt;
+        this.reg=copyThis.reg;
+        this.par=copyThis.par;
+	}
+	@Override
+	public Dense copy() {
+		return new Dense(this);
+	}
+	
 
 	public Dense(){
 		this(true, 0, null);

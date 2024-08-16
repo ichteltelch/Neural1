@@ -15,6 +15,14 @@ import org.siquod.ml.neural1.TensorFormat;
 
 public class FormatCast extends InOutCastLayer{
 
+	
+	public FormatCast(FormatCast copyThis) {
+		super(copyThis);
+	}
+	@Override
+	public InOutModule copy() {
+		return this;
+	}
 	public FormatCast(Interface in2, int shift, TensorFormat outTf) {
 		super(in2);
 		if(in.count<shift + outTf.count())

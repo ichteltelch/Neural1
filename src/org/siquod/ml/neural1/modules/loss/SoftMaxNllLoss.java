@@ -24,6 +24,17 @@ public class SoftMaxNllLoss extends LossLayer{
 	LogSoftmax sm;
 	NllLoss loss;
 	Interface hidden;
+
+	public SoftMaxNllLoss(SoftMaxNllLoss copyThis) {
+		this.sm=copyThis.sm.copy();
+		this.loss=copyThis.loss.copy();
+		this.hidden=copyThis.hidden;
+	}
+	@Override
+	public SoftMaxNllLoss copy() {
+		return new SoftMaxNllLoss(this); 
+	}
+
 	public SoftMaxNllLoss(String... ph){
 		this(null, ph);
 	}
@@ -60,16 +71,16 @@ public class SoftMaxNllLoss extends LossLayer{
 		sm.backprop(phase, params, as, errors, t, inst);
 	}
 
-////	@Override
-//	public void declareDependencies(Dependencies d) {
-//		sm.declareDependencies(d);
-//		loss.declareDependencies(d);
-//	}
+	////	@Override
+	//	public void declareDependencies(Dependencies d) {
+	//		sm.declareDependencies(d);
+	//		loss.declareDependencies(d);
+	//	}
 	@Override
 	public void dontComputeInPhase(String phase) {
 		hidden.dontComputeInPhase(phase);
 	}
-//	@Override
+	//	@Override
 	public boolean wouldBackprop(String phase) {
 		return true;
 	}

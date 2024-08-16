@@ -40,6 +40,29 @@ public class Sparse implements InOutBiasModule{
 	//	boolean useResidual;
 	int dt;
 	Regularizer reg;
+	public Sparse(Sparse copyThis) {
+		this.in = copyThis.in;
+        this.out = copyThis.out;
+        this.weights = copyThis.weights;
+        this.bias = copyThis.bias;
+        if(copyThis.coordinateBias!=null){
+            this.coordinateBias=copyThis.coordinateBias.clone();
+        }
+        this.shift=copyThis.shift!=null?shift.clone():null;
+        this.connect=copyThis.connect;
+        this.filling=copyThis.filling;
+        this.posi=copyThis.posi!=null?copyThis.posi.clone():null;
+        this.coordinateActivations=copyThis.coordinateActivations!=null?copyThis.coordinateActivations.clone():null;
+        this.useBias=copyThis.useBias;
+        this.useCoordinateBias=copyThis.useCoordinateBias.clone();
+        this.biasInit=copyThis.biasInit;
+        this.reg=copyThis.reg;
+        this.dt=copyThis.dt;     
+	}
+	@Override
+	public Sparse copy() {
+		return new Sparse(this);
+	}
 	public Sparse(float filling){
 		this(filling, true, 0, null);
 	}

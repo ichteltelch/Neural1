@@ -19,6 +19,10 @@ public class GaussianNllLoss extends LossLayer{
 	private static final double lnSqrtTau = 0.5*Math.log(2*Math.PI);
 	Interface in, target, loss;
 	@Override
+	public LossLayer copy() {
+		return this;
+	}
+	@Override
 	public void allocate(InterfaceAllocator ia) {
 		in = ia.get("in");
 		int ic = in.count;

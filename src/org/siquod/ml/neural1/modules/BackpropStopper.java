@@ -22,7 +22,17 @@ public class BackpropStopper extends InOutCastLayer{
 	Predicate<String> backprop=NEVER;
 	private int dt;
 	private int[] shift, posi;
-
+	public BackpropStopper(BackpropStopper copyThis) {
+		super(copyThis);
+		this.backprop=copyThis.backprop;
+        this.dt=copyThis.dt;
+        this.shift=copyThis.shift==null?null:copyThis.shift.clone();
+        posi=copyThis.posi==null?null:copyThis.posi.clone();
+	}
+	@Override
+	public BackpropStopper copy() {
+		return new BackpropStopper(this);
+	}
 	public BackpropStopper(Interface in, String outName, int dt, int[] shift){
 		super(in);
 		out=new Interface(outName, in.count, in.tf);

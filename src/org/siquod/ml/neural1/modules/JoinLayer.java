@@ -26,8 +26,18 @@ public class JoinLayer implements NopCastLayer{
 	Interface out;
 	ArrayList<Interface> in=new ArrayList<>();
 	ArrayList<Integer> offsets=new ArrayList<>();
+
+	public JoinLayer(JoinLayer copyThis) {
+		this.out=copyThis.out;
+		this.in=new ArrayList<>(copyThis.in);
+		this.offsets=new ArrayList<>(copyThis.offsets);
+	}
+	@Override
+	public JoinLayer copy() {
+		return this;
+	}
 	public JoinLayer(){
-		
+
 	}
 	public JoinLayer input(int offset, Interface i){
 		if(i==null)
@@ -60,11 +70,11 @@ public class JoinLayer implements NopCastLayer{
 	}
 	@Override
 	public void allocate(ParamAllocator ia) {
-		
+
 	}
 	@Override
 	public void share(ParamBlocks ps) {
-		
+
 	}
 	@Override
 	public ParamBlocks getParamBlocks() {
@@ -76,19 +86,19 @@ public class JoinLayer implements NopCastLayer{
 	}
 	@Override
 	public void backprop(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, int t, int[] inst) {
-		
+
 	}
-////	@Override
-//	public void declareDependencies(Dependencies d) {
-//		for(Interface i: in)
-//			d.declare(new InputDependency(i, this, 0));
-//		d.declare(new OutputDependency(this, out));			
-//	}
+	////	@Override
+	//	public void declareDependencies(Dependencies d) {
+	//		for(Interface i: in)
+	//			d.declare(new InputDependency(i, this, 0));
+	//		d.declare(new OutputDependency(this, out));			
+	//	}
 	@Override
 	public void dontComputeInPhase(String phase) {
-		
+
 	}
-//	@Override
+	//	@Override
 	public boolean wouldBackprop(String phase) {
 		return true;
 	}

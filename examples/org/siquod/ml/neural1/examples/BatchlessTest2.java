@@ -207,7 +207,7 @@ public class BatchlessTest2 implements Runnable{
 	private InOutModule makeStack() {
 		boolean useBias = bnType==BnType.NONE;
 		int firstLayerWidth = 50; //50
-		int extraLayers = 20; //2
+		int extraLayers = 2;
 		
 		int extraLayerWidth =40; //40
 		StackModule ret = new StackModule();
@@ -323,7 +323,7 @@ public class BatchlessTest2 implements Runnable{
 	@Override
 	public void run() {
 		while(!done){
-			batchTrain(miniBatches?1000000:100);
+			batchTrain(miniBatches?1000:100);
 			if(graphical) {
 				updateGraphics();
 				disp.repaint();
@@ -369,6 +369,15 @@ public class BatchlessTest2 implements Runnable{
 		Color[] colors={
 				Color.red, Color.green, Color.blue
 		};
+		Color[] softColors = new Color[colors.length];;
+		for(int i=0; i<colors.length; ++i) {
+			Color c = colors[i];
+			
+			float r = c.getRed()/255f;
+			float g = c.getGreen()/255f;
+			float b = c.getBlue()/255f;
+			softColors[i]=new Color(1-0.3f*(1-r), 1-0.3f*(1-g), 1-0.3f*(1-b));
+		}
 
 
 		int wx = dispOutput.getWidth();
@@ -392,7 +401,7 @@ public class BatchlessTest2 implements Runnable{
 					}
 				}
 				if(mi != -1)
-					dispOutput.setRGB(ix, iy, colors[mi].getRGB());
+					dispOutput.setRGB(ix, iy, softColors[mi].getRGB());
 			}			
 		}
 		long t1=System.currentTimeMillis();
@@ -415,6 +424,9 @@ public class BatchlessTest2 implements Runnable{
 			int ix = (int) ((dat[0]-minX)*wx/(maxX-minX));
 			int iy = (int) ((dat[1]-minY)*wy/(maxY-minY));
 			int r = 2;
+			g.setColor(Color.white);
+			g.fillOval(ix-r, iy-r, 2*r, 2*r);
+			g.setColor(Color.black);
 			g.drawOval(ix-r, iy-r, 2*r, 2*r);
 		}
 	}
@@ -624,8 +636,8 @@ public class BatchlessTest2 implements Runnable{
 		sampleLogs=null;
 	}
 	public static void main(String[] args) throws InterruptedException {
-		if(!true) {
-			BatchlessTest2 inst = new BatchlessTest2(data2, data2Test, 64, BnType.BLN, !true);
+		if(true) {
+			BatchlessTest2 inst = new BatchlessTest2(data2, data2Test, 64, BnType.BLN, true);
 			inst.run();
 			return;
 		}

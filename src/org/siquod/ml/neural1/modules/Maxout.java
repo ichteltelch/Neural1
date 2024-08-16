@@ -20,6 +20,16 @@ public class Maxout implements InOutModule{
 	Interface out;
 	int k;
 	int di;
+	public Maxout(Maxout copyThis) {
+		this.in=copyThis.in;
+        this.out=copyThis.out;
+        this.k=copyThis.k;
+        this.di=copyThis.di;
+	}
+	@Override
+	public Maxout copy() {
+		return this;
+	}
 	public Maxout() {
 	}
 	@Override

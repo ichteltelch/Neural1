@@ -34,6 +34,9 @@ public class FeedForward {
 		{
 			init();
 		}
+		InOutModule net = FeedForward.this.net.copy();
+		LossLayer lossLayer = FeedForward.this.lossLayer.copy();
+
 		ParamSet ps;
 		public final ActivationBatch ass= new ActivationBatch(1, 1, ia, ba);
 		ActivationSeq as=ass.a[0];
@@ -212,6 +215,15 @@ public class FeedForward {
 		public ParamSet getParams() {
 			return ps;
 		}
+		public FeedForward getModel() {
+			return FeedForward.this;
+		}
+		public Eval getAnother(boolean copyParams) {
+			Eval ret = new Eval(copyParams?ps.clone():ps);
+			if(inputWhitener!=null)
+				ret.inputWhitener(inputWhitener.copy());
+			return ret;
+		}		
 	}
 	public static String confusionMatrixToString(int[][] mat) {
 		StringBuilder t = new StringBuilder();
