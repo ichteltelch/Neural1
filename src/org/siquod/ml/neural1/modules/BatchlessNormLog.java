@@ -3,6 +3,7 @@ package org.siquod.ml.neural1.modules;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -125,7 +126,7 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 					int endI = ch;
 					int startBri = 0;
 					int endBri = tf.dims[0];
-					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, drownout!=0);
 				}else {
 					AtomicInteger done = new AtomicInteger();
 					int neededWorkers = Math.min(par, taskCount);
@@ -143,7 +144,7 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 									int endI = (task+1) * ch / taskCount;
 									int startBri = 0;
 									int endBri = tf.dims[0];
-									forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+									forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, drownout!=0);
 								}
 							}));
 						}
@@ -167,7 +168,7 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 					int startBri = 0;
 					int endBri = tf.dims[0];
 
-					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, false);
 				}else{
 					AtomicInteger done = new AtomicInteger();
 					int workersNeeded = Math.min(par, maxPar);
@@ -186,7 +187,7 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 										int endI = ch;
 										int startBri = 0;
 										int endBri = tf.dims[0];
-										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, false);
 									}
 								}));
 							}
@@ -203,7 +204,7 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 										int endA = as.length;
 										int startBri = 0;
 										int endBri = tf.dims[0];
-										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri);
+										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, false);
 									}
 								}));
 							}
@@ -226,7 +227,7 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 
 	}
 	private void forwardSlice(ParamSet params, ActivationBatch as, int t, 
-			int startI, int endI, int startA, int endA, int startBri, int endBri) {
+			int startI, int endI, int startA, int endA, int startBri, int endBri, boolean doDrownout) {
 		for(int bi = startA; bi<endA; ++bi) {
 			double lossContrib = 0;
 			ActivationSeq b = as.a[bi];
@@ -250,6 +251,9 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 					float activation = a.get(in, index);
 					float normalized = (activation - mean)*scal;
 					lossContrib += normalized*normalized*0.5 + log_sdev;
+					if(doDrownout)
+						normalized = normalized * drownOutDataAmplitude + (float)(drowner.nextGaussian())*drownOutNoiseAmplitude;
+
 					float denormalized = normalized*multVal + addVal;
 					a.add(out, index, denormalized);
 				}
@@ -340,7 +344,7 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 				//				float mean = params.get(this.mean, i);
 				float log_sdev = params.get(this.log_sd, i);
 				//				float addVal=hasAdd?params.get(add, i):0;
-				float multVal=params.get(mult, i);
+				float multVal=params.get(mult, i)*drownOutDataAmplitude;
 
 				float scal = (float)Math.exp(-log_sdev);
 				for(int bri = startBri; bri<endBri; bri++) {
@@ -582,5 +586,14 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 	public double mapSigmaToStorage(double s) {
 		return Math.log(s);
 	}
-
+	Random drowner = new Random();
+	double drownout=0;
+	float drownOutNoiseAmplitude = 0;
+	float drownOutDataAmplitude = 1;
+	public BatchlessNormLog drownout(double drown) {
+		drownout=drown;
+		drownOutNoiseAmplitude = (float) Math.sqrt(drown);
+		drownOutDataAmplitude = (float) Math.sqrt(1-drown);
+		return this;
+	}
 }

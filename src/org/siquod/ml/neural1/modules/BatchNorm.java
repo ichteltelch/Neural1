@@ -2,6 +2,7 @@ package org.siquod.ml.neural1.modules;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.function.Function;
 
 import org.siquod.ml.neural1.ActivationBatch;
@@ -134,6 +135,8 @@ public class BatchNorm extends BatchNormoid{
 							continue;
 						ActivationSet a = b.get(t);
 						float d = (a.get(in, i) - mean)*scal;
+						if(drownout!=0)
+							d = d * drownOutDataAmplitude + (float)(drowner.nextGaussian())*drownOutNoiseAmplitude;
 						float v = d*multVal + addVal;
 						a.add(out, i, v);
 					}
@@ -191,7 +194,7 @@ public class BatchNorm extends BatchNormoid{
 				float scal = 1/(float)Math.sqrt(var+epsilon);
 
 				//				float addVal=params.get(add, i);
-				float multVal=params.get(mult, i);
+				float multVal=params.get(mult, i)*drownOutDataAmplitude;
 				int count=0;
 				float scalErr=0;
 
@@ -398,5 +401,15 @@ public class BatchNorm extends BatchNormoid{
 			ret += lossContrib;	
 		}
 		return ret;
+	}
+	Random drowner = new Random();
+	double drownout=0;
+	float drownOutNoiseAmplitude = 0;
+	float drownOutDataAmplitude = 1;
+	public BatchNorm drownout(double drown) {
+		drownout=drown;
+		drownOutNoiseAmplitude = (float) Math.sqrt(drown);
+		drownOutDataAmplitude = (float) Math.sqrt(1-drown);
+		return this;
 	}
 }

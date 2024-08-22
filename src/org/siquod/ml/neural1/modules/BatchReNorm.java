@@ -3,6 +3,7 @@ package org.siquod.ml.neural1.modules;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -35,6 +36,7 @@ public class BatchReNorm extends BatchNormoid{
 
 	Function<Integer, Float> rmaxSchedule=rmaxSchedule(100);
 	Function<Integer, Float> dmaxSchedule=dmaxSchedule(100);
+	
 	
 	public BatchReNorm(BatchReNorm copyThis) {
 		super(copyThis);
@@ -141,7 +143,7 @@ public class BatchReNorm extends BatchNormoid{
 					int endI = ch;
 					int startBri = 0;
 					int endBri = tf.dims[0];
-					forwardSlice(params, as, t, bparm, startI, endI, startBri, endBri, dmax, rmax);
+					forwardSlice(params, as, t, bparm, startI, endI, startBri, endBri, dmax, rmax, drownout!=0);
 				}else {
 					AtomicInteger done = new AtomicInteger();
 					int neededWorkers = Math.min(par, taskCount);
@@ -157,7 +159,7 @@ public class BatchReNorm extends BatchNormoid{
 									int endI = (task+1) * ch / taskCount;
 									int startBri = 0;
 									int endBri = tf.dims[0];
-									forwardSlice(params, as, t, bparm, startI, endI, startBri, endBri, dmax, rmax);
+									forwardSlice(params, as, t, bparm, startI, endI, startBri, endBri, dmax, rmax, drownout!=0);
 								}
 							}));
 						}
@@ -278,7 +280,7 @@ public class BatchReNorm extends BatchNormoid{
 		}
 	}
 	private void forwardSlice(ParamSet params, ActivationBatch as, int t, ActivationSet bparm, int startI, int endI,
-			int startBri, int endBri, float dmax, float rmax) {
+			int startBri, int endBri, float dmax, float rmax, boolean doDrownout) {
 		for(int i=startI; i<endI; ++i) {
 			float mean=0;
 			int count=0;
@@ -330,6 +332,8 @@ public class BatchReNorm extends BatchNormoid{
 				for(int bri = startBri; bri<endBri; ++bri) {
 					int index = tf.index(bri, i);
 					float dv = (a.get(in, index) - mean)*scal*r+d;
+					if(doDrownout)
+						dv = dv * drownOutDataAmplitude + (float)(drowner.nextGaussian())*drownOutNoiseAmplitude;
 					float v = dv*multVal + addVal;
 					a.add(out, index, v);
 				}
@@ -401,7 +405,7 @@ public class BatchReNorm extends BatchNormoid{
 			//				float d=Math.min(dmax, Math.max(-dmax, (mean-rmean)/rsdev));
 
 			//				float addVal=params.get(add, i);
-			float multVal=params.get(mult, i);
+			float multVal=params.get(mult, i)*drownOutDataAmplitude;
 			int count=0;
 			float scalErr=0;
 
@@ -674,5 +678,15 @@ public class BatchReNorm extends BatchNormoid{
 			ret += lossContrib;	
 		}
 		return ret;
+	}
+	Random drowner = new Random();
+	double drownout=0;
+	float drownOutNoiseAmplitude = 0;
+	float drownOutDataAmplitude = 1;
+	public BatchReNorm drownout(double drown) {
+		drownout=drown;
+		drownOutNoiseAmplitude = (float) Math.sqrt(drown);
+		drownOutDataAmplitude = (float) Math.sqrt(1-drown);
+		return this;
 	}
 }
