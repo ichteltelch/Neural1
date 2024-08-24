@@ -524,7 +524,7 @@ public class BatchReNorm extends BatchNormoid{
 		for(int i=startI; i<endI; ++i) {
 			float mean = bp.get(this.mean, i);
 			float sdev = bp.get(this.sdev, i);
-			float scal = 1/sdev;
+			float scal = drownOutDataAmplitude/sdev;
 			float rmean=params.get(runningMean, i);
 			float rsdev=params.get(runningSdev, i);
 

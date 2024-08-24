@@ -27,7 +27,7 @@ public class L2Loss extends LossLayer{
         this.in=copyThis.in;
         this.target=copyThis.target;
         this.loss=copyThis.loss;
-        this.phases=new ArrayList<String>(copyThis.phases);
+        this.phases=phases==null?null:new ArrayList<String>(copyThis.phases);
         this.lgs=copyThis.lgs;
         this.tf=copyThis.tf;
     }

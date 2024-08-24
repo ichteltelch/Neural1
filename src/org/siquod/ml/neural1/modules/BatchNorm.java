@@ -22,6 +22,7 @@ public class BatchNorm extends BatchNormoid{
 
 	private static final float epsilon = 1e-10f;
 	private Interface in;
+	private Interface noise;
 	private Interface out;
 	private Interface mean, var;
 	boolean hasAdd=true;
@@ -36,6 +37,7 @@ public class BatchNorm extends BatchNormoid{
         this.hasAdd = copyThis.hasAdd;
         this.add = copyThis.add;
         this.mult = copyThis.mult;
+        this.noise = copyThis.noise;
         this.tf = copyThis.tf;
 	}
 	@Override
@@ -55,6 +57,8 @@ public class BatchNorm extends BatchNormoid{
 	public void allocate(InterfaceAllocator ia) {
 		in = ia.get("in");
 		out = ia.get("out");
+		if(drownout!=0)
+			noise = ia.allocate(new Interface("noise", in.tf));
 		if(in.count!=out.count)
 			throw new IllegalArgumentException("input and output layer must be of the same size");
 		tf = new TensorFormat(1, in.count);
@@ -99,6 +103,15 @@ public class BatchNorm extends BatchNormoid{
 		if(inst==null) {
 			if(training != ForwardPhase.TESTING) {
 				for(int i=0; i<in.count; ++i) {
+					if(noise!=null) {
+						for(ActivationSeq b: as) {
+							if(b==null)
+								continue;
+							ActivationSet a = b.get(t);
+							float nse =  (float)(drowner.nextGaussian())*drownOutNoiseAmplitude;
+							a.set(noise, i, nse);
+						}
+					}
 					float mean=0;
 					int count=0;
 					for(ActivationSeq b: as) {
@@ -135,8 +148,11 @@ public class BatchNorm extends BatchNormoid{
 							continue;
 						ActivationSet a = b.get(t);
 						float d = (a.get(in, i) - mean)*scal;
-						if(drownout!=0)
-							d = d * drownOutDataAmplitude + (float)(drowner.nextGaussian())*drownOutNoiseAmplitude;
+						if(noise!=null) {
+							float nse =  a.get(noise, i);
+							a.set(noise, i, nse);
+							d = d * drownOutDataAmplitude + nse;
+						}
 						float v = d*multVal + addVal;
 						a.add(out, i, v);
 					}
@@ -194,7 +210,7 @@ public class BatchNorm extends BatchNormoid{
 				float scal = 1/(float)Math.sqrt(var+epsilon);
 
 				//				float addVal=params.get(add, i);
-				float multVal=params.get(mult, i)*drownOutDataAmplitude;
+				float multVal=params.get(mult, i);
 				int count=0;
 				float scalErr=0;
 
@@ -205,7 +221,7 @@ public class BatchNorm extends BatchNormoid{
 					count++;
 					ActivationSet a = as.a[b].get(t);
 					ActivationSet e = es.get(t);
-					float me=e.get(out, i)*multVal;
+					float me=e.get(out, i)*multVal*drownOutDataAmplitude;
 					float scalInp = (a.get(in, i)-mean);
 					scalErr+=me*scalInp;
 
@@ -223,7 +239,7 @@ public class BatchNorm extends BatchNormoid{
 					ActivationSet a = as.a[b].get(t);
 					ActivationSet e = es.get(t);
 					float scalInp = a.get(in, i)-mean;
-					float me=e.get(out, i)*multVal;
+					float me=e.get(out, i)*multVal*drownOutDataAmplitude;
 					me *= scal;
 					me += 2 * scalInp * varErr;
 					meanErr += -me;
@@ -236,7 +252,7 @@ public class BatchNorm extends BatchNormoid{
 					ActivationSet a = as.a[b].get(t);
 					ActivationSet e = es.get(t);
 					float scalInp = a.get(in, i)-mean;
-					float me=e.get(out, i)*multVal;
+					float me=e.get(out, i)*multVal*drownOutDataAmplitude;
 					me *= scal;
 					me += 2 * scalInp * varErr;
 					me += meanErr;
@@ -274,6 +290,9 @@ public class BatchNorm extends BatchNormoid{
 					float oe=e.get(out, i);
 					addErr += oe;
 					float reparin = (a.get(in, i)-mean)*scal;
+					if(noise!=null) {
+						reparin = reparin * drownOutDataAmplitude + a.get(noise, i);
+					}
 					multErr += reparin * oe;
 
 

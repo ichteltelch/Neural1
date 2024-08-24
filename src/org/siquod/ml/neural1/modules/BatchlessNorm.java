@@ -3,6 +3,7 @@ package org.siquod.ml.neural1.modules;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -125,7 +126,7 @@ public class BatchlessNorm extends AbstractBatchNorm{
 					int endI = ch;
 					int startBri = 0;
 					int endBri = tf.dims[0];
-					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, false);
+					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true, drownout!=0);
 				}else {
 					AtomicInteger done = new AtomicInteger();
 					int neededWorkers = Math.min(par, taskCount);
@@ -143,7 +144,7 @@ public class BatchlessNorm extends AbstractBatchNorm{
 									int endI = (task+1) * ch / taskCount;
 									int startBri = 0;
 									int endBri = tf.dims[0];
-									forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, false);
+									forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true, drownout!=0);
 								}
 							}));
 						}
@@ -167,7 +168,7 @@ public class BatchlessNorm extends AbstractBatchNorm{
 					int startBri = 0;
 					int endBri = tf.dims[0];
 
-					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true);
+					forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true, false);
 				}else{
 					AtomicInteger done = new AtomicInteger();
 					int workersNeeded = Math.min(par, maxPar);
@@ -186,7 +187,7 @@ public class BatchlessNorm extends AbstractBatchNorm{
 										int endI = ch;
 										int startBri = 0;
 										int endBri = tf.dims[0];
-										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true);
+										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true, false);
 									}
 								}));
 							}
@@ -203,7 +204,7 @@ public class BatchlessNorm extends AbstractBatchNorm{
 										int endA = as.length;
 										int startBri = 0;
 										int endBri = tf.dims[0];
-										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true);
+										forwardSlice(params, as, t, startI, endI, startA, endA, startBri, endBri, true, false);
 									}
 								}));
 							}
@@ -227,7 +228,7 @@ public class BatchlessNorm extends AbstractBatchNorm{
 	}
 	private void forwardSlice(ParamSet params, ActivationBatch as, int t, 
 			int startI, int endI, int startA, int endA, int startBri, int endBri,
-			boolean computeLoss) {
+			boolean computeLoss, boolean doDrownout) {
 		for(int bi = startA; bi<endA; ++bi) {
 			double lossContrib = 0;
 			ActivationSeq b = as.a[bi];
@@ -252,6 +253,8 @@ public class BatchlessNorm extends AbstractBatchNorm{
 					float normalized = (activation - mean)*scal;
 					if(computeLoss)
 						lossContrib += 0.5*normalized*normalized + Math.log(Math.abs(sdev));
+					if(doDrownout)
+						normalized = normalized * drownOutDataAmplitude + (float)(drowner.nextGaussian())*drownOutNoiseAmplitude;
 					float denormalized = normalized*multVal + addVal;
 					a.add(out, index, denormalized);
 				}
@@ -259,10 +262,10 @@ public class BatchlessNorm extends AbstractBatchNorm{
 
 			}
 			if(computeLoss) {
-			lossContrib *= gradmul;
-			synchronized (loss) {
-				a.add(loss, 1, (float)lossContrib);
-			}
+				lossContrib *= gradmul;
+				synchronized (loss) {
+					a.add(loss, 1, (float)lossContrib);
+				}
 			}
 		}
 	}
@@ -344,7 +347,7 @@ public class BatchlessNorm extends AbstractBatchNorm{
 //				float mean = params.get(this.mean, i);
 				float sdev = params.get(this.sd, i);
 //				float addVal=hasAdd?params.get(add, i):0;
-				float multVal=params.get(mult, i);
+				float multVal=params.get(mult, i)*drownOutDataAmplitude;
 
 				float scal = 1/sdev;
 				for(int bri = startBri; bri<endBri; bri++) {
@@ -447,7 +450,8 @@ public class BatchlessNorm extends AbstractBatchNorm{
 					float shifted = in_activation - mean;
 					float normalized = shifted*scal;
 					ðmult += normalized * ðout;
-					
+					normalized *= drownOutDataAmplitude;
+
 					ðmean += ðloss_lr * (-normalized*scal);
 					ðlog_sdev += ðloss_lr * (1 - normalized*normalized);
 				}
@@ -592,5 +596,15 @@ public class BatchlessNorm extends AbstractBatchNorm{
 	@Override
 	public double mapSigmaToStorage(double s) {
 		return s;
+	}
+	Random drowner = new Random();
+	double drownout=0;
+	float drownOutNoiseAmplitude = 0;
+	float drownOutDataAmplitude = 1;
+	public BatchlessNorm drownout(double drown) {
+		drownout=drown;
+		drownOutNoiseAmplitude = (float) Math.sqrt(drown);
+		drownOutDataAmplitude = (float) Math.sqrt(1-drown);
+		return this;
 	}
 }

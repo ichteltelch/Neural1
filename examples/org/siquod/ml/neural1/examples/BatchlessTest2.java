@@ -3,7 +3,6 @@ package org.siquod.ml.neural1.examples;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
-import java.awt.image.ByteLookupTable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,7 +10,6 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.function.ToDoubleFunction;
 
-import javax.management.monitor.StringMonitorMBean;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -25,11 +23,10 @@ import org.siquod.ml.neural1.modules.BatchNormoid;
 import org.siquod.ml.neural1.modules.BatchNormoid.FinalizationMode;
 import org.siquod.ml.neural1.modules.BatchReNorm;
 import org.siquod.ml.neural1.modules.BatchlessNorm;
-import org.siquod.ml.neural1.modules.BatchlessNormLog;
 import org.siquod.ml.neural1.modules.BatchlessNormInv;
+import org.siquod.ml.neural1.modules.BatchlessNormLog;
 import org.siquod.ml.neural1.modules.Copy;
 import org.siquod.ml.neural1.modules.Dense;
-import org.siquod.ml.neural1.modules.Dropout;
 import org.siquod.ml.neural1.modules.InOutModule;
 import org.siquod.ml.neural1.modules.Nonlin;
 import org.siquod.ml.neural1.modules.StackModule;
@@ -39,10 +36,7 @@ import org.siquod.ml.neural1.modules.regularizer.Regularizer;
 import org.siquod.ml.neural1.net.FeedForward;
 import org.siquod.ml.neural1.neurons.Isrlu;
 import org.siquod.ml.neural1.neurons.Neuron;
-import org.siquod.ml.neural1.optimizers.Adam;
 import org.siquod.ml.neural1.optimizers.AmsGrad;
-import org.siquod.ml.neural1.optimizers.Rprop;
-import org.siquod.ml.neural1.optimizers.SGD;
 
 
 public class BatchlessTest2 implements Runnable{
@@ -117,32 +111,32 @@ public class BatchlessTest2 implements Runnable{
 
 	ArrayList<BatchNormoid> needsFinalize= new ArrayList<>(); 
 	ArrayList<AbstractBatchNorm> needsInit = new ArrayList<>(); 
-
+	double drownout=0.1;
 	private InOutModule bn() {
 		switch(bnType) {
 		case NONE: return new Copy();
 		case BN: {
-			BatchNorm bn = new BatchNorm();
+			BatchNorm bn = new BatchNorm().drownout(drownout);
 			needsFinalize.add(bn);
 			return bn;
 		}
 		case BRN: {
-			BatchReNorm brn = new BatchReNorm();
+			BatchReNorm brn = new BatchReNorm().drownout(drownout);
 			needsFinalize.add(brn);
 			return brn;
 		}
 		case BLN: {
-			BatchlessNorm bn = new BatchlessNorm(()->net.loss);
+			BatchlessNorm bn = new BatchlessNorm(()->net.loss).drownout(drownout);
 			needsInit.add(bn);
 			return bn;
 		}
 		case BLNLOG: {
-			BatchlessNormLog bn = new BatchlessNormLog(()->net.loss);
+			BatchlessNormLog bn = new BatchlessNormLog(()->net.loss).drownout(drownout);
 			needsInit.add(bn);
 			return bn;
 		}
 		case BLNINV: {
-			BatchlessNormInv bn = new BatchlessNormInv(()->net.loss);
+			BatchlessNormInv bn = new BatchlessNormInv(()->net.loss).drownout(drownout);
 			needsInit.add(bn);
 			return bn;
 		}
@@ -218,13 +212,15 @@ public class BatchlessTest2 implements Runnable{
 				//Add a nonlinearity layer using the chosen activation function
 				.addLayer(firstLayerWidth, new Nonlin(neuron))
 				//Add a dropout layer for better regularization
-				.addLayer(Dropout.factory(0.9));
+//				.addLayer(Dropout.factory(0.9))
+				;
 		for(int i=0; i<extraLayers; ++i) {
 			ret
 				//Add another dense and batch norm and nonlinearity layer, with 40 channels each
 				.addLayer(extraLayerWidth, new Dense(useBias).regularizer(reg), bn(), new Nonlin(neuron))
 				//Add a dropout layer for better regularization
-				.addLayer(Dropout.factory(0.9));
+//				.addLayer(Dropout.factory(0.9))
+				;
 		}
 	
 				//			//Add another dense and batch norm and nonlinearity layer, with 40 channels each
@@ -637,7 +633,8 @@ public class BatchlessTest2 implements Runnable{
 	}
 	public static void main(String[] args) throws InterruptedException {
 		if(true) {
-			BatchlessTest2 inst = new BatchlessTest2(data2, data2Test, 64, BnType.BLN, true);
+//			BatchlessTest2 inst = new BatchlessTest2(data2, data2Test, 64, BnType.BLNLOG, true);
+			BatchlessTest2 inst = new BatchlessTest2(data2, data2Test, 64, BnType.BN, true);
 			inst.run();
 			return;
 		}

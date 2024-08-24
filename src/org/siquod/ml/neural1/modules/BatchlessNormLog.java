@@ -447,7 +447,7 @@ public class BatchlessNormLog extends AbstractBatchNorm{
 					float shifted = in_activation - mean;
 					float normalized = shifted*scal;
 					ðmult += normalized * ðout;
-
+					normalized *= drownOutDataAmplitude;
 					ðmean += ðloss_lr * (-normalized*scal);
 					ðlog_sdev += ðloss_lr * (1 - normalized*normalized);
 				}

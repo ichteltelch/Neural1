@@ -8,8 +8,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 
-import org.siquod.ml.neural1.modules.InOutModule;
-
 public interface Module {
 	public static final ExecutorService parallelizer = Executors.newCachedThreadPool(); 
 
