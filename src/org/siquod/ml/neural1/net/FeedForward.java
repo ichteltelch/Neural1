@@ -300,7 +300,11 @@ public class FeedForward {
 			u = updater==null?new Rprop():updater;
 		}
 
-		public void epoch(TrainingBatchCursor data, int batchSize) {
+		double lossAccumulated=0;
+		int lossSamples=0;
+		public double epoch(TrainingBatchCursor data, int batchSize) {
+			lossAccumulated=0;
+			lossSamples=0;
 			data.reset();
 			if(batchSize<=0)
 				batchSize=imp.length;
@@ -343,6 +347,7 @@ public class FeedForward {
 					break;
 
 			}
+			return lossAccumulated/lossSamples;
 		}
 
 		public void addToBatch(float[] input, float[] targ, double importance){
@@ -379,6 +384,8 @@ public class FeedForward {
 			double ret = 0;
 			for(ActivationSeq as: ass.a)
 				ret += as.get(0).get(loss, 0);
+			lossAccumulated += ret;
+			lossSamples += currentBatchSize;
 			ret /= currentBatchSize;
 			for(int i=0; i<currentBatchSize; ++i) {
 				ActivationSeq es = ess.a[i];
