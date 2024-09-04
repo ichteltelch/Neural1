@@ -6,6 +6,17 @@ public class ActivationBatch implements Cloneable, Iterable<ActivationSeq>{
 	public ActivationSeq[] a;
 	public ActivationSeq batchParams;
 	public int length;
+	public void setLength(int length) {
+		if(length > a.length)
+			throw new IllegalArgumentException("batch size cannot be increased beyond"+a.length);
+        this.length = length;
+	}
+	public void setToMaxLength() {
+		this.length = a.length;
+	}
+	public int getMaxLength() {
+		return a.length;
+	}
 	public ActivationBatch(int batchSize, int time, InterfaceAllocator activ, InterfaceAllocator bparam) {
 		length=batchSize;
 		a=new ActivationSeq[batchSize];

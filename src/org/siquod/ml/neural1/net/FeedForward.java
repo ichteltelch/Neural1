@@ -38,20 +38,26 @@ public class FeedForward {
 		LossLayer lossLayer = FeedForward.this.lossLayer.copy();
 
 		ParamSet ps;
-		public final ActivationBatch ass= new ActivationBatch(1, 1, ia, ba);
-		ActivationSeq as=ass.a[0];
-		ActivationSet a=as.get(0);
+		public final ActivationBatch ass;
+		final ActivationSeq as;
+		final ActivationSet a;
 		float[] whitenedInputs = new float[in.count];
 		private Whitener inputWhitener;
 		public Eval(ParamSet ps){
+			this(ps, 1);
+		}
+		public Eval(ParamSet ps, int maxBatchSize){
 			this.ps=ps;
 			if(ps.size()!=paramCount)
 				throw new IllegalArgumentException("Param set has wrong size");
+			ass= new ActivationBatch(maxBatchSize, 1, ia, ba);
+			as=ass.a[0];
+			a=as.get(0);
 
 		}
 		public void eval(float[] input, float[] output){
 
-
+			ass.setLength(1);
 			a.clear();
 			//			as.clearLifeInterfaces(true);
 
@@ -60,6 +66,34 @@ public class FeedForward {
 			a.set(in, applyWhitener(input));
 			net.forward(ForwardPhase.TESTING, ps, ass, 0, null);
 			a.get(out, output);
+
+			//			lossLayer.forward(ForwardPhase.TRAINING, ps, ass, 0, null);
+			//			double lossVal =a.get(loss, 0);
+			//			//			System.out.println(lossVal);
+			//			return lossVal;
+		}
+		public void eval(float[][] input, float[][] output){
+			for(int i=0; i<input.length; i+= ass.getMaxLength()) {
+				int start = i;
+				int end = Math.min(i+ass.getMaxLength(), input.length);
+				eval(input, output, start, end);
+			}
+		}
+		public void eval(float[][] input, float[][] output, int start, int end){
+
+			ass.setLength(end-start);
+			ass.clear();
+			net.initializeRun(ass, false);
+			for(int i=start; i<end; i++){
+				ass.a[i].get(0).set(in, applyWhitener(input[i]));
+			}
+			
+			//			as.clearLifeInterfaces(true);
+			net.forward(ForwardPhase.TESTING, ps, ass, 0, null);
+			
+			for(int i=start; i<end; i++){
+				ass.a[i].get(0).get(out, output[i]);
+			}
 
 			//			lossLayer.forward(ForwardPhase.TRAINING, ps, ass, 0, null);
 			//			double lossVal =a.get(loss, 0);
