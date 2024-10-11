@@ -498,7 +498,7 @@ public class FeedForward {
 	}
 	InterfaceAllocator ia;
 	boolean inited = false;
-	public FeedForward init() {
+	public synchronized FeedForward init() {
 		if(inited)
 			return this;
 		inited = true;
