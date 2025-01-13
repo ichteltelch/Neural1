@@ -1,7 +1,6 @@
 package org.siquod.ml.neural1.modules.loss;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -39,6 +38,10 @@ public class L2Loss extends LossLayer{
 		this(null, ph);
 	}
 
+	@Override
+	public int extraGates() {
+		return 0;
+	}
 
 	public L2Loss(LossGroup[] lgs, String... ph) {
 		this.lgs=lgs;

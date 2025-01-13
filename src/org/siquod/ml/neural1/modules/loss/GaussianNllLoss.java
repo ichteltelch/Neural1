@@ -34,6 +34,11 @@ public class GaussianNllLoss extends LossLayer{
 	@Override
 	public void allocate(ParamAllocator ia) {
 	}
+	
+	@Override
+	public int extraGates() {
+		return 0;
+	}
 
 	@Override
 	public void share(ParamBlocks ps) {

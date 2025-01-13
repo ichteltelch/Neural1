@@ -30,15 +30,19 @@ public class NllLoss extends LossLayer{
 	Interface in, target, loss;
 	List<String> phases;
 	LossGroup[] lgs;
-	TensorFormat tf;
+	TensorFormat inTf;
+	TensorFormat targetTf;
+	final int extraGates;
 
 	public NllLoss(NllLoss copyThis) {
+		this.extraGates = copyThis.extraGates;
 		this.in=copyThis.in;
 		this.target=copyThis.target;
 		this.loss=copyThis.loss;
 		this.phases=phases==null?null:new ArrayList<String>(copyThis.phases);
 		this.lgs=copyThis.lgs;
-		this.tf=copyThis.tf;
+		this.inTf=copyThis.inTf;
+		this.targetTf=copyThis.targetTf;
 
 	}
 	@Override
@@ -47,29 +51,41 @@ public class NllLoss extends LossLayer{
 	}
 
 	public NllLoss(String... ph) {
-		this(null, ph);
+		this(null, 0, ph);
 	}
 
+	@Override
+	public int extraGates() {
+		return extraGates;
+	}
 
-	public NllLoss(LossGroup[] lgs, String... ph) {
+	public NllLoss(LossGroup[] lgs, int extraGates, String... ph) {
 		phases=Arrays.asList(ph.clone());
 		this.lgs=lgs;
+		this.extraGates=extraGates;
 	}
 
 
 	@Override
 	public void allocate(InterfaceAllocator ia) {
 		in = ia.get("in");
-		target=ia.get("target", in.count);
+		target=ia.get("target", in.count+extraGates);
 		loss=ia.get("loss");
-		tf=in.tf;
-		while(tf.rank>2) {
-			tf = tf.flattenIndexAndNext(1);
+		inTf=in.tf;
+		targetTf=target.tf;
+		while(inTf.rank>2) {
+			inTf = inTf.flattenIndexAndNext(1);
 		}
-		if(tf.rank==1) {
-			tf = tf.insertUnitIndex(0);
+		if(inTf.rank==1) {
+			inTf = inTf.insertUnitIndex(0);
 		}
-		int channels = tf.channels();
+		while(targetTf.rank>2) {
+			targetTf = targetTf.flattenIndexAndNext(1);
+		}
+		if(targetTf.rank==1) {
+			targetTf = targetTf.insertUnitIndex(0);
+		}
+		int channels = inTf.channels();
 		if(lgs==null)
 			lgs=LossGroup.makeDefault(channels);
 		else {
@@ -97,7 +113,7 @@ public class NllLoss extends LossLayer{
 
 	@Override
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch ass, int t, int[] inst) {
-		int n0 = tf.dims[0];
+		int n0 = inTf.dims[0];
 		for(ActivationSeq as: ass) {
 			ActivationSet a=as.get(t);
 			float r = 0;
@@ -107,7 +123,7 @@ public class NllLoss extends LossLayer{
 						continue;
 					float gate;
 					if(lg.isGated()) {
-						gate =  a.get(target, tf.index(bri, lg.gate));
+						gate =  a.get(target, targetTf.index(bri, lg.gate));
 						if(lg.gateInverted)
 							gate = 1-gate;
 						if(gate==0)
@@ -119,9 +135,10 @@ public class NllLoss extends LossLayer{
 					float rr = 0;
 					if(lg.isSingleton()) {
 						int i = lg.start;
-						int index = tf.index(bri, i);
-						double trg = a.get(target, index);
-						double pp = a.get(in, index);
+						int inIndex = inTf.index(bri, i);
+						int targetIndex = targetTf.index(bri, i);
+						double trg = a.get(target, targetIndex);
+						double pp = a.get(in, inIndex);
 
 						if (trg>0) {
 							rr += trg*(Math.log(trg)-Math.log(pp));
@@ -135,10 +152,11 @@ public class NllLoss extends LossLayer{
 						}
 					}else {
 						for(int i=lg.start; i<lg.end; i++){
-							int index = tf.index(bri, i);
-							double trg = a.get(target, index);
+							int inIndex = inTf.index(bri, i);
+							int targetIndex = targetTf.index(bri, i);
+							double trg = a.get(target, targetIndex);
 							if (trg<=0) continue;
-							double pp = a.get(in, index);
+							double pp = a.get(in, inIndex);
 							rr += trg*(Math.log(trg)-pp);
 							//							if(!Float.isFinite(rr)) {
 							//								System.out.println();
@@ -158,7 +176,7 @@ public class NllLoss extends LossLayer{
 	public void backprop(String phase, ParamSet params, ActivationBatch as, ActivationBatch errors, int t, int[] inst) {
 		if(inst!=null)
 			throw new IllegalThreadStateException("A "+getClass().getName()+" module must not be inside a convolution");
-		int n0 = tf.dims[0];
+		int n0 = inTf.dims[0];
 		for(int b=0; b<as.length; ++b) {
 			ActivationSet a=as.a[b].get(t);
 			ActivationSet es = errors.a[b].get(t);
@@ -169,7 +187,7 @@ public class NllLoss extends LossLayer{
 						continue;
 					float gate;
 					if(lg.isGated()) {
-						gate =  a.get(target, tf.index(bri, lg.gate));
+						gate =  a.get(target, targetTf.index(bri, lg.gate));
 						if(lg.gateInverted)
 							gate = 1-gate;
 						if(gate==0)
@@ -182,9 +200,10 @@ public class NllLoss extends LossLayer{
 
 					if(lg.isSingleton()) {
 						int i = lg.start;
-						int index = tf.index(bri, i);
-						float trg = a.get(target, index);
-						float pp = a.get(in, index);
+						int inIndex = inTf.index(bri, i);
+						int targetIndex = targetTf.index(bri, i);
+						float trg = a.get(target, targetIndex);
+						float pp = a.get(in, inIndex);
 
 						float ppe=0;
 						if (trg>0) {
@@ -196,7 +215,7 @@ public class NllLoss extends LossLayer{
 						if(!Float.isFinite(ppe)) {
 							ppe=0;
 						}
-						es.add(in, index, ppe*ge);
+						es.add(in, inIndex, ppe*ge);
 
 					}else {
 						//						for(int i=lg.start; i<lg.end; i++){
@@ -211,8 +230,9 @@ public class NllLoss extends LossLayer{
 						//
 						//						}
 						for(int i=lg.start; i<lg.end; i++){
-							int index = tf.index(bri, i);
-							es.add(in, index, -a.get(target, index)*ge);
+							int inIndex = inTf.index(bri, i);
+							int targetIndex = targetTf.index(bri, i);
+							es.add(in, inIndex, -a.get(target, targetIndex)*ge);
 						}	
 					}
 

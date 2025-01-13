@@ -39,6 +39,7 @@ final public class LossGroup{
 	 * Multiply the loss contributions by this factor
 	 */
 	public final float weight;
+	
 	public LossGroup(int start, int length) {
 		this(start, length, -1, false, 1);
 	}

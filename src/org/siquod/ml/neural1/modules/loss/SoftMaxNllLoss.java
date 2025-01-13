@@ -36,11 +36,11 @@ public class SoftMaxNllLoss extends LossLayer{
 	}
 
 	public SoftMaxNllLoss(String... ph){
-		this(null, ph);
+		this(null, 0, ph);
 	}
-	public SoftMaxNllLoss(LossGroup[] lgs, String... ph){
+	public SoftMaxNllLoss(LossGroup[] lgs, int extraGates, String... ph){
 		sm=new LogSoftmax(lgs);
-		loss=new NllLoss(lgs, ph);
+		loss=new NllLoss(lgs, extraGates, ph);
 	}
 	@Override
 	public void allocate(InterfaceAllocator ia) {
@@ -58,6 +58,10 @@ public class SoftMaxNllLoss extends LossLayer{
 	@Override
 	public ParamBlocks getParamBlocks() {
 		return null;
+	}
+	@Override
+	public int extraGates() {
+		return loss.extraGates;
 	}
 	@Override
 	public void forward(ForwardPhase training, ParamSet params, ActivationBatch as, int t, int[] inst) {

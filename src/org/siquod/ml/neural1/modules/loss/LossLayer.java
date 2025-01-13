@@ -16,6 +16,10 @@ public abstract class LossLayer implements Module{
 		allocate(ia);
 		ia.pop();
 	}
+	
+	abstract public int extraGates();
 	@Override
 	public abstract LossLayer copy();
+	
+
 }
