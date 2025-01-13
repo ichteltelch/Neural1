@@ -5,13 +5,25 @@ public class PolyInteractionCursor<BT extends TrainingBatchCursor> implements Tr
 	protected final int inputCount;
 	protected final int order;
 	protected final BT back;
-	protected final int bic;
-
-	public PolyInteractionCursor(int inputCount, int order, BT back, int bic) {
-		this.inputCount = inputCount;
-		this.order = order;
+	protected final int interactingFeatures;
+	protected final int interactedFeatures;
+	protected final int prefixLength;
+	protected final int suffixLength;
+	protected final int inSuffixOffset;
+	protected final int outSuffixOffset;
+	protected final int outputCount;
+	
+	public PolyInteractionCursor(BT back, int order, int prefixLength, int suffixLength) { 
 		this.back = back;
-		this.bic = bic;
+		this.prefixLength = prefixLength;
+		this.suffixLength = suffixLength;
+		this.interactingFeatures = back.inputCount() - (prefixLength + suffixLength);
+		this.interactedFeatures = PolyInteraction.simplexNumberSum(interactingFeatures, 1, order);		
+		this.inputCount = interactedFeatures + prefixLength + suffixLength;
+		this.inSuffixOffset = prefixLength + interactingFeatures;
+		this.outSuffixOffset = prefixLength + interactedFeatures;
+		this.order = order;
+		this.outputCount = back.outputCount();
 	}
 
 	@Override public int outputCount() {return back.outputCount();}
@@ -22,7 +34,9 @@ public class PolyInteractionCursor<BT extends TrainingBatchCursor> implements Tr
 
 	@Override public void giveInputs(double[] inputs) {
 		back.giveInputs(inputs);
-		PolyInteraction.apply(bic, 2, order, inputs, 0, inputs, bic);
+		if(suffixLength!=0)
+			System.arraycopy(inputs, inSuffixOffset, inputs, outSuffixOffset, suffixLength);
+		PolyInteraction.apply(interactedFeatures, 2, order, inputs, prefixLength, inputs, prefixLength + interactingFeatures);
 	}
 
 	@Override public double getWeight() {return back.getWeight();}
@@ -36,6 +50,6 @@ public class PolyInteractionCursor<BT extends TrainingBatchCursor> implements Tr
 	@Override public PolyInteractionCursor<BT> clone() {
 		BT bc;
 		bc = (BT) back.clone();
-		return new PolyInteractionCursor<BT>(inputCount, order, bc, bic);
+		return new PolyInteractionCursor<BT>(bc, order, prefixLength, suffixLength);
 	}
 }

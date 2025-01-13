@@ -10,15 +10,33 @@ package org.siquod.ml.data;
  */
 public interface TrainingDataGiver {
 	/**
-	 * The number of input variables of a training example
+	 * The number of input variables of a training example.
+	 * Override this if there are unused input indices that you want to inform client code can be discarded.
+	 * @return
+	 */
+	default public int usedInputCount() {
+		return inputCount();
+	}
+	/**
+	 * The number of output variables of a training example
+	 * Override this if there are unused output indices that you want to inform client code can be discarded.
+	 * @return
+	 */
+	default public int usedOutputCount() {
+		return outputCount();
+	}
+	
+	/**
+	 * The number of indices reserved in a training example input vector
 	 * @return
 	 */
 	public int inputCount();
 	/**
-	 * The number of output variables of a training example
+	 * The number of indices reserved in a training example target vector
 	 * @return
 	 */
 	public int outputCount();
+	
 	/**
 	 * Write the input variable values into the given array
 	 * @param inputs

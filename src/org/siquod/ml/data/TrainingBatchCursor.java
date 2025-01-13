@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.function.DoubleUnaryOperator;
 
 /**
  * A {@link TrainingBatchCursor} presents a sequence of training data items to a
@@ -243,6 +244,30 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 		default RandomAccess scaleWeights(double weightScale) {
 			return new RemappedCursor.RandomAccess(this, weightScale, null, null);
 		}
+		
+		public default RandomAccess transformInputs(CursorTransformer inT) {
+			return new TransformedCursor_RA(this, inT, null, null);
+		}
+		public default RandomAccess transformInputs(CursorTransformer inT, DoubleUnaryOperator weightT) {
+			return new TransformedCursor_RA(this, inT, null, weightT);
+		}
+		public default RandomAccess transformOutputs(CursorTransformer outT) {
+			return new TransformedCursor_RA(this, null, outT, null);
+		}
+		public default RandomAccess transformOutputs(CursorTransformer outT, DoubleUnaryOperator weightT) {
+			return new TransformedCursor_RA(this, null, outT, weightT);
+		}
+		public default RandomAccess transformOutputs(CursorTransformer inT, CursorTransformer outT) {
+			return new TransformedCursor_RA(this, inT, outT, null);
+		}
+		public default RandomAccess transformOutputs(CursorTransformer inT, CursorTransformer outT, DoubleUnaryOperator weightT) {
+			return new TransformedCursor_RA(this, inT, outT, weightT);
+		}
+		public default RandomAccess transformWeights(DoubleUnaryOperator weightT) {
+			return new TransformedCursor_RA(this, null, null, weightT);
+		}
+		
+		
 	}
 	default TrainingBatchCursor remap(double weightScale, int[] outputMapping, int... inputMapping) {
 		return new RemappedCursor<TrainingBatchCursor>(this, weightScale, outputMapping, inputMapping);
@@ -552,28 +577,11 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 			return concat(sc);
 		}
 	}
-	/**
-	 * Make a wrapper for a {@link TrainingBatchCursor} that enriches its inputs by
-	 * taking polynomial combinations of the original data's inputs up to a given order
-	 * 
-	 * @param back
-	 * @param order
-	 * @return
-	 */
-	public static TrainingBatchCursor polyInteractionFeatures(TrainingBatchCursor back, int order) {
-		if(order==1)
-			return back;
-		int bic = back.inputCount();
-		int eInp = bic;
-		for(int i=2; i<=order; ++i)
-			eInp+=PolyInteraction.simplexNumber(bic, i);
-		int inputCount = eInp;
-		return new PolyInteractionCursor<TrainingBatchCursor>(inputCount, order, back, bic);
-	}
+
 	static class PolyInteractionCursor_RA extends PolyInteractionCursor<RandomAccess> implements RandomAccess{
 
-		public PolyInteractionCursor_RA(int inputCount, int order, RandomAccess back, int bic) {
-			super(inputCount, order, back, bic);
+		public PolyInteractionCursor_RA(RandomAccess back, int order, int prefixLength, int suffixLength) {
+			super(back, order, prefixLength, suffixLength);
 		}
 
 		@Override
@@ -588,9 +596,47 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 
 		@Override
 		public PolyInteractionCursor_RA clone() {
-			return new PolyInteractionCursor_RA(this.inputCount, this.order, this.back.clone(), this.bic);
+			return new PolyInteractionCursor_RA(this.back.clone(), this.order, this.prefixLength, this.suffixLength);
 		}
 		
+	}
+	
+	
+	static class TransformedCursor_RA extends TransformedCursor<RandomAccess> implements RandomAccess{
+
+		public TransformedCursor_RA(RandomAccess back, CursorTransformer inputTransformer, CursorTransformer outputTransformer, DoubleUnaryOperator weightTransformer) {
+			super(back, inputTransformer, outputTransformer, weightTransformer);
+		}
+
+		@Override
+		public long size() {
+			return this.back.size();
+		}
+
+		@Override
+		public void seek(long position) {
+			this.back.seek(position);
+		}
+
+		@Override
+		public TransformedCursor_RA clone() {
+			return new TransformedCursor_RA(this.back.clone(), inputTransform, outputTransform, weightTransform);
+		}
+		
+	}
+	
+	/**
+	 * Make a wrapper for a {@link TrainingBatchCursor} that enriches its inputs by
+	 * taking polynomial combinations of the original data's inputs up to a given order
+	 * 
+	 * @param back
+	 * @param order
+	 * @return
+	 */
+	public static TrainingBatchCursor polyInteractionFeatures(TrainingBatchCursor back, int order) {
+		if(order==1)
+			return back;
+		return new PolyInteractionCursor<TrainingBatchCursor>(back, order, 0, 0);
 	}
 	/**
 	 * Make a wrapper for a {@link TrainingBatchCursor} that enriches its inputs by
@@ -600,16 +646,40 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 	 * @param order
 	 * @return
 	 */
-	public static TrainingBatchCursor.RandomAccess polyInteractionFeatures(TrainingBatchCursor.RandomAccess back, int order) {
+	public static TrainingBatchCursor.RandomAccess polyInteractionFeatures(
+			TrainingBatchCursor.RandomAccess back, int order) {
 		if(order==1)
 			return back;
-		int bic = back.inputCount();
-		int eInp = bic;
-		for(int i=2; i<=order; ++i)
-			eInp+=PolyInteraction.simplexNumber(bic, i);
-		int inputCount = eInp;
-		return new PolyInteractionCursor_RA(inputCount, order, back, bic);
+		return new PolyInteractionCursor_RA(back, order, 0, 0);
 	}
+	/**
+	 * Make a wrapper for a {@link TrainingBatchCursor} that enriches its inputs by
+	 * taking polynomial combinations of the original data's inputs up to a given order
+	 * 
+	 * @param back
+	 * @param order
+	 * @return
+	 */
+	public static TrainingBatchCursor polyInteractionFeatures(TrainingBatchCursor back, int order, int prefixLength, int suffixLength) {
+		if(order==1)
+			return back;
+		return new PolyInteractionCursor<TrainingBatchCursor>(back, order, prefixLength, suffixLength);
+	}
+	/**
+	 * Make a wrapper for a {@link TrainingBatchCursor} that enriches its inputs by
+	 * taking polynomial combinations of the original data's inputs up to a given order
+	 * 
+	 * @param back
+	 * @param order
+	 * @return
+	 */
+	public static TrainingBatchCursor.RandomAccess polyInteractionFeatures(
+			TrainingBatchCursor.RandomAccess back, int order, int prefixLength, int suffixLength) {
+		if(order==1)
+			return back;
+		return new PolyInteractionCursor_RA(back, order, prefixLength, suffixLength);
+	}
+	
 	public default RamBuffer ramBuffer() {
 		return ramBuffer(this);
 	}
@@ -866,5 +936,29 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 		}
 		return false;
 	}
+	
+	public default TrainingBatchCursor transformInputs(CursorTransformer inT) {
+		return new TransformedCursor<>(this, inT, null, null);
+	}
+	public default TrainingBatchCursor transformInputs(CursorTransformer inT, DoubleUnaryOperator weightT) {
+		return new TransformedCursor<>(this, inT, null, weightT);
+	}
+	public default TrainingBatchCursor transformOutputs(CursorTransformer outT) {
+		return new TransformedCursor<>(this, null, outT, null);
+	}
+	public default TrainingBatchCursor transformOutputs(CursorTransformer outT, DoubleUnaryOperator weightT) {
+		return new TransformedCursor<>(this, null, outT, weightT);
+	}
+	public default TrainingBatchCursor transformOutputs(CursorTransformer inT, CursorTransformer outT) {
+		return new TransformedCursor<>(this, inT, outT, null);
+	}
+	public default TrainingBatchCursor transformOutputs(CursorTransformer inT, CursorTransformer outT, DoubleUnaryOperator weightT) {
+		return new TransformedCursor<>(this, inT, outT, weightT);
+	}
+	public default TrainingBatchCursor transformWeights(DoubleUnaryOperator weightT) {
+		return new TransformedCursor<>(this, null, null, weightT);
+	}
+
+    
 	
 }
