@@ -55,6 +55,12 @@ public class PolyInteraction {
 	}
 
 	public static int simplexNumber(int n, int order) {
+		switch(order) {
+		case 0: return 1;
+		case 1: return n;
+		case 2: return (int)(n*(long)(n+1)/2);
+		case 3: return (int)(n*(long)(n+1)*(n+2)/6);
+		}
 		long num = n;
 		long den = 1;
 		for(int i=1; i<order; ++i) {
