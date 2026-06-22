@@ -36,7 +36,7 @@ public class PolyInteractionCursor<BT extends TrainingBatchCursor> implements Tr
 		back.giveInputs(inputs);
 		if(suffixLength!=0)
 			System.arraycopy(inputs, inSuffixOffset, inputs, outSuffixOffset, suffixLength);
-		PolyInteraction.apply(interactedFeatures, 2, order, inputs, prefixLength, inputs, prefixLength + interactingFeatures);
+		PolyInteraction.apply(interactingFeatures, 2, order, inputs, prefixLength, inputs, prefixLength + interactingFeatures);
 	}
 
 	@Override public double getWeight() {return back.getWeight();}

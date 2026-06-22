@@ -884,7 +884,7 @@ public interface TrainingBatchCursor extends TrainingDataGiver, Cloneable{
 				original.giveOutputs(outputs);
 			else {
 				original.giveOutputs(buffer);
-				for(int i=0; i<ic; ++i) {
+				for(int i=0; i<oc; ++i) {
 					outputs[i]=buffer[outputMapping[i]];
 				}
 			}			

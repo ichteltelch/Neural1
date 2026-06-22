@@ -208,7 +208,7 @@ public class PolyInteraction {
 			throw new IllegalArgumentException("order must be positive");
 		}else if(order==1) {
 			for(int i=0; i<n; ++i)
-				din[varIndex] += dout[doutOffset+i]*in[i]*multiplier;
+				din[varIndex] += dout[doutOffset+i]*in[inOffset+i]*multiplier;
 			return n;
 		}else {
 			int count = 0;
@@ -371,7 +371,7 @@ public class PolyInteraction {
 			throw new IllegalArgumentException("order must be positive");
 		}else if(order==1) {
 			for(int i=0; i<n; ++i)
-				din[varIndex] += dout[doutOffset+i]*in[i]*multiplier;
+				din[varIndex] += dout[doutOffset+i]*in[inOffset+i]*multiplier;
 			return n;
 		}else {
 			int count = 0;

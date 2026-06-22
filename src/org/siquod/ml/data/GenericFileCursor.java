@@ -87,6 +87,10 @@ public class GenericFileCursor implements TrainingBatchCursor.RandomAccess, Auto
 
 	@Override
 	public GenericFileCursor clone() {
+		if(outputFloatsInFile>0)
+			return new GenericFileCursor(inputFile, inputFloatsPerSet, outputFloatsPerSet, normalizeWeights);
+		if(fixedOutput!=null)
+			return new GenericFileCursor(inputFile, fixedOutput, inputFloatsPerSet, normalizeWeights);
 		return new GenericFileCursor(inputFile, output, oneHot, inputFloatsPerSet, normalizeWeights);
 	}
 

@@ -155,7 +155,7 @@ public class PolyInteractionString {
 			throw new IllegalArgumentException("order must be positive");
 		}else if(order==1) {
 			for(int i=0; i<n; ++i)
-				din[varIndex] += " + "+multiplier+" "+in[i]+" "+dout[doutOffset+i];
+				din[varIndex] += " + "+multiplier+" "+in[inOffset+i]+" "+dout[doutOffset+i];
 			return n;
 		}else {
 			int count = 0;
